@@ -3,7 +3,9 @@ package service
 import (
 	"time"
 
-	"lighthouse.uni-kiel.de/lighthouse-api/auth"
+	"github.com/golang-jwt/jwt/v5"
+	"lighthouse.uni-kiel.de/lighthouse-api/config"
+	"lighthouse.uni-kiel.de/lighthouse-api/crypto"
 	"lighthouse.uni-kiel.de/lighthouse-api/model"
 	"lighthouse.uni-kiel.de/lighthouse-api/repository"
 )
@@ -12,10 +14,10 @@ type UserService interface {
 	GetAll() ([]model.User, error)
 	GetByID(id uint) (*model.User, error)
 	GetByName(name string) (*model.User, error)
-	Register(user *model.User, registrationKey string) error
-	Create(user *model.User) error
-	Update(user *model.User) error
-	Delete(user *model.User) error
+	Login(username, password string) (*model.Token, error)
+	Register(username, password, email, registrationKey string) error
+	Create(username, password, email string) error
+	Update(id uint, username, password, email string) error
 	DeleteByID(id uint) error
 	GetRolesOfUser(userid uint) ([]model.Role, error)
 	AddRoleToUser(userid, roleid uint) error
@@ -50,8 +52,67 @@ func (s *userService) GetByName(name string) (*model.User, error) {
 	return s.userRepository.FindByName(name)
 }
 
-func (s *userService) Register(user *model.User, registrationKey string) error {
-	// TODO: maybe rewrite to use registration key service instead of repository
+func (s *userService) Login(username, password string) (*model.Token, error) {
+	user, err := s.userRepository.FindByName(username)
+	// don't leak if username exists -> both cases return the same response
+	if err != nil {
+		return nil, model.UnauthorizedError{Message: "Invalid credentials", Err: nil}
+	}
+	if !crypto.PasswordMatchesHash(password, user.Password) {
+		return nil, model.UnauthorizedError{Message: "Invalid credentials", Err: nil}
+	}
+	// using JWT for now
+	// TODO: maybe switch to normal session cookies
+	now := time.Now()
+	claims := jwt.RegisteredClaims{
+		// Issuer:    "heimdall",
+		Subject: username,
+		// Audience:  []string{"heimdall", "beacon"},
+		ExpiresAt: jwt.NewNumericDate(now.Add(config.GetDuration("JWT_VALID_DURATION", 1*time.Hour))),
+		// NotBefore: jwt.NewNumericDate(now),
+		// IssuedAt:  jwt.NewNumericDate(now),
+	}
+	// only subject and expires_at: 129 characters
+	// all claims: 235 characters
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenStr, err := token.SignedString(crypto.JwtPrivateKey)
+	if err != nil {
+		return nil, model.InternalServerError{Message: "Could not sign JWT", Err: err}
+	}
+
+	// token, err = jwt.ParseWithClaims(tokenStr, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
+	// 	return crypto.JwtPrivateKey, nil
+	// })
+	// if claims, ok := token.Claims.(*jwt.RegisteredClaims); ok && token.Valid {
+	// 	fmt.Printf("Token valid! Claims: %+v\n", claims)
+	// } else {
+	// 	fmt.Println(err)
+	// }
+	return &model.Token{Token: tokenStr}, nil
+}
+
+func validateUser(username, password, email string) error {
+	if !isValidName(username) {
+		return model.BadRequestError{Message: "Invalid name"}
+	}
+	if !isValidPassword(password) {
+		return model.BadRequestError{Message: "Password does not meet criteria"}
+	}
+	if !isValidEmail(email) {
+		return model.BadRequestError{Message: "Invalid email"}
+	}
+	return nil
+}
+
+func (s *userService) checkIfUserExists(username string) error {
+	_, err := s.userRepository.FindByName(username)
+	if err == nil {
+		return model.ConflictError{Message: "Username already exists"}
+	}
+	return nil
+}
+
+func (s *userService) Register(username, password, email, registrationKey string) error {
 	key, err := s.registrationKeyRepository.FindByKey(registrationKey)
 	if err != nil {
 		switch err.(type) {
@@ -60,65 +121,68 @@ func (s *userService) Register(user *model.User, registrationKey string) error {
 		}
 		return err
 	}
-
-	// check if registration key is expired or closed
-	if !key.Permanent && (key.ExpiresAt.Before(time.Now()) || key.Closed) {
-		return model.ForbiddenError{Message: "registration key expired"}
+	// check if registration key is expired
+	if time.Now().After(key.ExpiresAt) && !key.Permanent {
+		return model.UnauthorizedError{Message: "registration key expired"}
 	}
 
-	hashedPassword, err := auth.HashPassword(user.Password)
+	if err := validateUser(username, password, email); err != nil {
+		return err
+	}
+	if err := s.checkIfUserExists(username); err != nil {
+		return err
+	}
+	hashedPassword, err := crypto.HashPassword(password)
 	if err != nil {
 		return model.InternalServerError{Message: "could not hash password", Err: err}
 	}
-	user.Password = string(hashedPassword)
-
-	if user.DisplayName == "" {
-		user.DisplayName = user.Username
+	now := time.Now()
+	user := model.User{
+		Username:          username,
+		Password:          string(hashedPassword),
+		Email:             email,
+		LastLogin:         &now,
+		RegistrationKeyID: &key.ID,
 	}
-
-	user.RegistrationKeyID = &key.ID
-	return s.userRepository.Save(user)
+	return s.userRepository.Save(&user)
 }
 
-func (s *userService) Create(user *model.User) error {
-	_, err := s.userRepository.FindByName(user.Username)
-	if err == nil {
-		return model.ConflictError{Message: "username already exists"}
+func (s *userService) Create(username, password, email string) error {
+	if err := validateUser(username, password, email); err != nil {
+		return err
 	}
-	hashedPassword, err := auth.HashPassword(user.Password)
+	if err := s.checkIfUserExists(username); err != nil {
+		return err
+	}
+	hashedPassword, err := crypto.HashPassword(password)
 	if err != nil {
 		return model.InternalServerError{Message: "could not hash password", Err: err}
 	}
-	user.Password = string(hashedPassword)
-	return s.userRepository.Save(user)
+	user := model.User{
+		Username:  username,
+		Password:  string(hashedPassword),
+		Email:     email,
+		LastLogin: nil,
+	}
+	return s.userRepository.Save(&user)
 }
 
-func (s *userService) Update(newUser *model.User) error {
-	user, err := s.userRepository.FindByID(newUser.ID)
+func (s *userService) Update(id uint, username, password, email string) error {
+	user, err := s.userRepository.FindByID(id)
 	if err != nil {
 		return err
 	}
-	if newUser.Username != "" {
-		user.Username = newUser.Username
+	if err := validateUser(username, password, email); err != nil {
+		return err
 	}
-	if newUser.Password != "" {
-		hashedPassword, err := auth.HashPassword(newUser.Password)
-		if err != nil {
-			return model.InternalServerError{Message: "could not hash password", Err: err}
-		}
-		user.Password = string(hashedPassword)
+	user.Username = username
+	hashedPassword, err := crypto.HashPassword(password)
+	if err != nil {
+		return model.InternalServerError{Message: "could not hash password", Err: err}
 	}
-	if newUser.Email != "" {
-		user.Email = newUser.Email
-	}
-	if newUser.DisplayName != "" {
-		user.DisplayName = newUser.DisplayName
-	}
+	user.Password = string(hashedPassword)
+	user.Email = email
 	return s.userRepository.Save(user)
-}
-
-func (s *userService) Delete(user *model.User) error {
-	return s.userRepository.Delete(user)
 }
 
 func (s *userService) DeleteByID(id uint) error {
@@ -130,7 +194,11 @@ func (s *userService) GetRolesOfUser(userid uint) ([]model.Role, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s.userRepository.GetRolesOfUser(user)
+	roles, err := s.userRepository.GetRolesOfUser(user)
+	if err != nil {
+		return nil, err
+	}
+	return roles, nil
 }
 
 func (s *userService) AddRoleToUser(userid, roleid uint) error {

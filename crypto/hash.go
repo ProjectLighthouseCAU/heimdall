@@ -1,7 +1,6 @@
-package auth
+package crypto
 
 import (
-	"crypto/rand"
 	"log"
 	"time"
 
@@ -35,17 +34,4 @@ func calculateOptimalCost() int {
 	}
 	log.Printf("	Setting optimal bcrypt hashing cost factor to: %d\n", cost)
 	return cost
-}
-
-const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
-func NewRandomString(length int) string {
-	bytes := make([]byte, length)
-	if _, err := rand.Read(bytes); err != nil {
-		log.Println(err)
-	}
-	for i, b := range bytes {
-		bytes[i] = chars[b%byte(len(chars))]
-	}
-	return string(bytes)
 }

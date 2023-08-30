@@ -92,7 +92,7 @@
         },
         "/user/{id}": {
             "get": {
-                "description": "Returns a user given a username",
+                "description": "Returns a user by id",
                 "produces": [
                     "application/json"
                 ],
@@ -137,48 +137,6 @@
                         }
                     }
                 }
-            },
-            "patch": {
-                "description": "Updates a user",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "text/plain"
-                ],
-                "operationId": "RegisterUser",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
             }
         },
         "/users": {
@@ -202,23 +160,26 @@
         }
     },
     "definitions": {
-        "model.Group": {
+        "model.RegistrationKey": {
             "type": "object",
             "properties": {
                 "created_at": {
                     "type": "string"
                 },
+                "description": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
-                "name": {
+                "key": {
                     "type": "string"
                 },
-                "resources": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/model.Resource"
-                    }
+                "permanent": {
+                    "type": "boolean"
                 },
                 "updated_at": {
                     "type": "string"
@@ -231,82 +192,26 @@
                 }
             }
         },
-        "model.Resource": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "path": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "model.Token": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "expires_at": {
-                    "description": "IssuedAt  time.Time --\u003e gorm.Model.CreatedAt",
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "token": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "userID": {
-                    "description": "foreign key",
-                    "type": "integer"
-                }
-            }
-        },
         "model.User": {
             "type": "object",
-            "required": [
-                "username"
-            ],
             "properties": {
                 "created_at": {
                     "type": "string"
                 },
-                "groups": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/model.Group"
-                    }
+                "email": {
+                    "type": "string"
                 },
                 "id": {
                     "type": "integer"
                 },
+                "last_login": {
+                    "type": "string"
+                },
+                "registration_key": {
+                    "$ref": "#/definitions/model.RegistrationKey"
+                },
                 "registration_key_id": {
-                    "description": "foreign key (pointer in order to be nullable)",
                     "type": "integer"
-                },
-                "resources": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/model.Resource"
-                    }
-                },
-                "tokens": {
-                    "description": "one-to-many",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/model.Token"
-                    }
                 },
                 "updated_at": {
                     "type": "string"

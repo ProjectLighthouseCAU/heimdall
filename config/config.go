@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"time"
 )
 
 func GetString(key, defaultValue string) string {
@@ -33,6 +34,18 @@ func GetBool(key string, defaultValue bool) bool {
 			return defaultValue
 		}
 		return s
+	}
+	return defaultValue
+}
+
+func GetDuration(key string, defaultValue time.Duration) time.Duration {
+	if value, exists := os.LookupEnv(key); exists {
+		d, err := time.ParseDuration(value)
+		if err != nil {
+			log.Printf("Found Config %s=%s, but could not parse it (duration required, e.g. \"1s\")", key, value)
+			return defaultValue
+		}
+		return d
 	}
 	return defaultValue
 }

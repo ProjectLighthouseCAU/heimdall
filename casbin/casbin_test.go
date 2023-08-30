@@ -1,4 +1,4 @@
-package auth
+package casbin
 
 import (
 	"testing"

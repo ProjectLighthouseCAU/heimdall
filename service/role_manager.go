@@ -166,3 +166,15 @@ func (rm *RoleManager) PrintRoles() error {
 func (rm *RoleManager) SetLogger(logger log.Logger) {
 	// do nothing
 }
+
+func (*RoleManager) AddDomainMatchingFunc(name string, fn rbac.MatchingFunc) {
+	panic("unimplemented")
+}
+
+func (*RoleManager) AddMatchingFunc(name string, fn rbac.MatchingFunc) {
+	panic("unimplemented")
+}
+
+func (*RoleManager) Match(str string, pattern string) bool {
+	panic("unimplemented")
+}

@@ -1,7 +1,5 @@
 package model
 
-import "fmt"
-
 // Indicates that a resource was not found
 type NotFoundError struct {
 	Message string
@@ -9,13 +7,42 @@ type NotFoundError struct {
 }
 
 func (e NotFoundError) Error() string {
-	return fmt.Sprintf("%s: %v", e.Message, e.Err)
+	s := "Not Found"
+	if e.Message != "" {
+		s = s + ": " + e.Message
+	}
+	if e.Err != nil {
+		s = s + ": " + e.Err.Error()
+	}
+	return s
 }
 func (e NotFoundError) Unwrap() error {
 	return e.Err
 }
 func (e NotFoundError) Status() int {
 	return 404
+}
+
+type BadRequestError struct {
+	Message string
+	Err     error
+}
+
+func (e BadRequestError) Error() string {
+	s := "Bad Request"
+	if e.Message != "" {
+		s = s + ": " + e.Message
+	}
+	if e.Err != nil {
+		s = s + ": " + e.Err.Error()
+	}
+	return s
+}
+func (e BadRequestError) Unwrap() error {
+	return e.Err
+}
+func (e BadRequestError) Status() int {
+	return 400
 }
 
 // Indicates an arbitrary internal server error
@@ -25,7 +52,14 @@ type InternalServerError struct {
 }
 
 func (e InternalServerError) Error() string {
-	return fmt.Sprintf("%s: %v", e.Message, e.Err)
+	s := "Internal Server Error"
+	if e.Message != "" {
+		s = s + ": " + e.Message
+	}
+	if e.Err != nil {
+		s = s + ": " + e.Err.Error()
+	}
+	return s
 }
 func (e InternalServerError) Unwrap() error {
 	return e.Err
@@ -41,7 +75,14 @@ type ConflictError struct {
 }
 
 func (e ConflictError) Error() string {
-	return fmt.Sprintf("%s: %v", e.Message, e.Err)
+	s := "Conflict"
+	if e.Message != "" {
+		s = s + ": " + e.Message
+	}
+	if e.Err != nil {
+		s = s + ": " + e.Err.Error()
+	}
+	return s
 }
 func (e ConflictError) Unwrap() error {
 	return e.Err
@@ -57,7 +98,14 @@ type UnauthorizedError struct {
 }
 
 func (e UnauthorizedError) Error() string {
-	return fmt.Sprintf("%s: %v", e.Message, e.Err)
+	s := "Unauthorized"
+	if e.Message != "" {
+		s = s + ": " + e.Message
+	}
+	if e.Err != nil {
+		s = s + ": " + e.Err.Error()
+	}
+	return s
 }
 func (e UnauthorizedError) Unwrap() error {
 	return e.Err
@@ -73,7 +121,14 @@ type ForbiddenError struct {
 }
 
 func (e ForbiddenError) Error() string {
-	return fmt.Sprintf("%s: %v", e.Message, e.Err)
+	s := "Forbidden"
+	if e.Message != "" {
+		s = s + ": " + e.Message
+	}
+	if e.Err != nil {
+		s = s + ": " + e.Err.Error()
+	}
+	return s
 }
 func (e ForbiddenError) Unwrap() error {
 	return e.Err

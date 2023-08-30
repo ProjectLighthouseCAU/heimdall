@@ -9,9 +9,8 @@ type RoleService interface {
 	GetAll() ([]model.Role, error)
 	GetByID(id uint) (*model.Role, error)
 	GetByName(name string) (*model.Role, error)
-	Create(role *model.Role) error
-	Update(role *model.Role) error
-	Delete(role *model.Role) error
+	Create(rolename string) error
+	Update(id uint, rolename string) error
 	DeleteByID(id uint) error
 	GetUsersOfRole(id uint) ([]model.User, error)
 	AddUserToRole(roleid, userid uint) error
@@ -44,20 +43,44 @@ func (r *roleService) GetByName(name string) (*model.Role, error) {
 	return r.roleRepository.FindByName(name)
 }
 
-func (r *roleService) Create(role *model.Role) error {
-	return r.roleRepository.Save(role)
+func validateRole(rolename string) error {
+	if !isValidName(rolename) {
+		return model.BadRequestError{Message: "Invalid name"}
+	}
+	return nil
 }
 
-func (r *roleService) Update(role *model.Role) error {
-	_, err := r.roleRepository.FindByID(role.ID)
+func (r *roleService) checkIfRoleExists(rolename string) error {
+	_, err := r.roleRepository.FindByName(rolename)
+	if err == nil {
+		return model.ConflictError{Message: "Role already exists"}
+	}
+	return nil
+}
+
+func (r *roleService) Create(rolename string) error {
+	if err := validateRole(rolename); err != nil {
+		return err
+	}
+	if err := r.checkIfRoleExists(rolename); err != nil {
+		return err
+	}
+	role := model.Role{
+		Name: rolename,
+	}
+	return r.roleRepository.Save(&role)
+}
+
+func (r *roleService) Update(id uint, rolename string) error {
+	role, err := r.roleRepository.FindByID(id)
 	if err != nil {
 		return err
 	}
+	if !isValidName(rolename) {
+		return model.BadRequestError{Message: "Invalid name"}
+	}
+	role.Name = rolename
 	return r.roleRepository.Save(role)
-}
-
-func (r *roleService) Delete(role *model.Role) error {
-	return r.roleRepository.Delete(role)
 }
 
 func (r *roleService) DeleteByID(id uint) error {
@@ -69,7 +92,11 @@ func (r *roleService) GetUsersOfRole(roleid uint) ([]model.User, error) {
 	if err != nil {
 		return nil, err
 	}
-	return r.roleRepository.GetUsersOfRole(role)
+	users, err := r.roleRepository.GetUsersOfRole(role)
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
 }
 
 func (r *roleService) AddUserToRole(roleid, userid uint) error {

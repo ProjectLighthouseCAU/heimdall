@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/monitor"
 	"github.com/gofiber/fiber/v2/middleware/pprof"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"gorm.io/gorm"
@@ -26,11 +27,11 @@ import (
 	_ "lighthouse.uni-kiel.de/lighthouse-api/docs"
 )
 
-// @title Lighthouse API
-// @version 1.0
-// @description This is the REST API of Project Lighthouse
-// @host localhost:8080
-// @BasePath /
+// @title			Lighthouse API
+// @version		1.0
+// @description	This is the REST API of Project Lighthouse
+// @host			localhost:8080
+// @BasePath		/
 func main() {
 
 	log.Println("Starting fiber")
@@ -42,6 +43,7 @@ func main() {
 		AppName:       "Lighthouse API",
 	})
 	log.Println("	Setting up middleware")
+	app.Use(logger.New())
 	app.Use(recover.New())
 	// app.Use(csrf.New()) // FIXME: csrf prevents everything except GET requests
 	app.Use(cors.New())
@@ -49,8 +51,9 @@ func main() {
 		Max:        300,
 		Expiration: 1 * time.Minute,
 	}))
-	app.Use(logger.New())
+	// TODO: secure monitoring routes
 	app.Use(pprof.New())
+	app.Get("/metrics", monitor.New())
 
 	// dependency injection
 	log.Println("	Connecting to database")
@@ -60,38 +63,50 @@ func main() {
 	registrationKeyRepository := repository.NewRegistrationKeyRepository(db)
 	roleRepository := repository.NewRoleRepository(db)
 
-	roleManager := service.NewRoleManager(roleRepository, userRepository)
+	roleManager := service.NewRoleManager(
+		roleRepository,
+		userRepository,
+	)
 	accessControlService := service.NewAccessControlService(
 		db,
 		userRepository,
 		roleRepository,
-		roleManager)
+		roleManager,
+	)
 	userService := service.NewUserService(
 		userRepository,
 		registrationKeyRepository,
-		roleRepository)
+		roleRepository,
+	)
 	registrationKeyService := service.NewRegistrationKeyService(
-		registrationKeyRepository)
+		registrationKeyRepository,
+	)
 	roleService := service.NewRoleService(
 		roleRepository,
-		userRepository)
+		userRepository,
+	)
 
 	userController := controller.NewUserController(
-		userService)
+		userService,
+	)
 	registrationKeyController := controller.NewRegistrationKeyController(
-		registrationKeyService)
+		registrationKeyService,
+	)
 	roleController := controller.NewRoleController(
-		roleService)
+		roleService,
+	)
 
 	casbinMiddleware := middleware.NewCasbinMiddleware(
-		accessControlService)
+		accessControlService,
+	)
 
 	routa := router.NewRouter(
 		app,
 		userController,
 		registrationKeyController,
 		roleController,
-		casbinMiddleware)
+		casbinMiddleware,
+	)
 
 	userRepository.Migrate()
 	registrationKeyRepository.Migrate()
@@ -104,6 +119,7 @@ func main() {
 	printRoutes(routa.ListRoutes())
 
 	// TODO: fix and finish swagger documentation
+	app.Get("/swagger", swagger.HandlerDefault)
 	app.Get("/swagger/*", swagger.HandlerDefault)
 	log.Println("Setup done. Listening...")
 	log.Fatal(app.Listen(":8080"))
@@ -136,6 +152,9 @@ func setupTestDatabase(db *gorm.DB) {
 	db.Create(&model.RegistrationKey{Key: "test_registration_key", ExpiresAt: time.Now().AddDate(0, 0, 3)})
 	db.Create(&model.User{Username: "Testuser", Password: "hashedPWplaceholder"})
 	db.Create(&model.Role{Name: "Testrole"})
+	db.Create(&model.Role{Name: "admin"})
+	db.Exec("INSERT INTO user_roles (user_id, role_id) values (1, 1)")
+	db.Exec("INSERT INTO user_roles (user_id, role_id) values (1, 2)")
 }
 
 func printRoutes(routes map[string][]string) {

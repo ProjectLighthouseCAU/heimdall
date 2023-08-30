@@ -4,13 +4,12 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"lighthouse.uni-kiel.de/lighthouse-api/model"
 	"lighthouse.uni-kiel.de/lighthouse-api/service"
 )
 
 type RegistrationKeyController interface {
-	GetAll(c *fiber.Ctx) error
 	Get(c *fiber.Ctx) error
+	GetByID(c *fiber.Ctx) error
 	Create(c *fiber.Ctx) error
 	Update(c *fiber.Ctx) error
 	Delete(c *fiber.Ctx) error
@@ -28,7 +27,17 @@ func NewRegistrationKeyController(r service.RegistrationKeyService) *registratio
 	}
 }
 
-func (rkc *registrationKeyController) GetAll(c *fiber.Ctx) error {
+func (rkc *registrationKeyController) Get(c *fiber.Ctx) error {
+	// query registration keys by key (string value)
+	keyStr := c.Query("key", "")
+	if keyStr != "" {
+		key, err := rkc.registrationKeyService.GetByKey(keyStr)
+		if err != nil {
+			return unwrapAndSendError(c, err)
+		}
+		return c.JSON(key)
+	}
+	// return all keys
 	keys, err := rkc.registrationKeyService.GetAll()
 	if err != nil {
 		return unwrapAndSendError(c, err)
@@ -36,19 +45,12 @@ func (rkc *registrationKeyController) GetAll(c *fiber.Ctx) error {
 	return c.JSON(keys)
 }
 
-func (rkc *registrationKeyController) Get(c *fiber.Ctx) error {
+func (rkc *registrationKeyController) GetByID(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
-	keyStr := c.Query("key", "")
-	if id < 0 && keyStr == "" {
+	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
-	var key *model.RegistrationKey
-	var err error
-	if id >= 0 {
-		key, err = rkc.registrationKeyService.GetByID(uint(id))
-	} else {
-		key, err = rkc.registrationKeyService.GetByKey(keyStr)
-	}
+	key, err := rkc.registrationKeyService.GetByID(uint(id))
 	if err != nil {
 		return unwrapAndSendError(c, err)
 	}
@@ -61,20 +63,12 @@ func (rkc *registrationKeyController) Create(c *fiber.Ctx) error {
 		Key         string    `json:"key"`
 		Description string    `json:"description"`
 		Permanent   bool      `json:"permanent"`
-		Closed      bool      `json:"closed"`
 		ExpiresAt   time.Time `json:"expires_at"`
 	}{}
 	if err := c.BodyParser(&payload); err != nil {
 		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
 	}
-	regKey := model.RegistrationKey{
-		Key:         payload.Key,
-		Description: payload.Description,
-		Permanent:   payload.Permanent,
-		Closed:      payload.Closed,
-		ExpiresAt:   payload.ExpiresAt,
-	}
-	err := rkc.registrationKeyService.Create(&regKey)
+	err := rkc.registrationKeyService.Create(payload.Key, payload.Description, payload.Permanent, payload.ExpiresAt)
 	if err != nil {
 		return unwrapAndSendError(c, err)
 	}
@@ -90,21 +84,12 @@ func (rkc *registrationKeyController) Update(c *fiber.Ctx) error {
 	payload := struct {
 		Description string    `json:"description"`
 		Permanent   bool      `json:"permanent"`
-		Closed      bool      `json:"closed"`
 		ExpiresAt   time.Time `json:"expires_at"`
 	}{}
 	if err := c.BodyParser(&payload); err != nil {
 		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
 	}
-
-	key := model.RegistrationKey{
-		Description: payload.Description,
-		Permanent:   payload.Permanent,
-		Closed:      payload.Closed,
-		ExpiresAt:   payload.ExpiresAt,
-	}
-	key.ID = uint(id)
-	err := rkc.registrationKeyService.Update(&key)
+	err := rkc.registrationKeyService.Update(uint(id), payload.Description, payload.Permanent, payload.ExpiresAt)
 	if err != nil {
 		return unwrapAndSendError(c, err)
 	}

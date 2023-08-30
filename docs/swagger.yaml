@@ -1,17 +1,19 @@
 basePath: /
 definitions:
-  model.Group:
+  model.RegistrationKey:
     properties:
       created_at:
         type: string
+      description:
+        type: string
+      expires_at:
+        type: string
       id:
         type: integer
-      name:
+      key:
         type: string
-      resources:
-        items:
-          $ref: '#/definitions/model.Resource'
-        type: array
+      permanent:
+        type: boolean
       updated_at:
         type: string
       users:
@@ -19,62 +21,24 @@ definitions:
           $ref: '#/definitions/model.User'
         type: array
     type: object
-  model.Resource:
-    properties:
-      created_at:
-        type: string
-      id:
-        type: integer
-      path:
-        type: string
-      updated_at:
-        type: string
-    type: object
-  model.Token:
-    properties:
-      created_at:
-        type: string
-      expires_at:
-        description: IssuedAt  time.Time --> gorm.Model.CreatedAt
-        type: string
-      id:
-        type: integer
-      token:
-        type: string
-      updated_at:
-        type: string
-      userID:
-        description: foreign key
-        type: integer
-    type: object
   model.User:
     properties:
       created_at:
         type: string
-      groups:
-        items:
-          $ref: '#/definitions/model.Group'
-        type: array
+      email:
+        type: string
       id:
         type: integer
+      last_login:
+        type: string
+      registration_key:
+        $ref: '#/definitions/model.RegistrationKey'
       registration_key_id:
-        description: foreign key (pointer in order to be nullable)
         type: integer
-      resources:
-        items:
-          $ref: '#/definitions/model.Resource'
-        type: array
-      tokens:
-        description: one-to-many
-        items:
-          $ref: '#/definitions/model.Token'
-        type: array
       updated_at:
         type: string
       username:
         type: string
-    required:
-    - username
     type: object
 host: localhost:8080
 info:
@@ -152,7 +116,7 @@ paths:
           schema:
             type: string
     get:
-      description: Returns a user given a username
+      description: Returns a user by id
       produces:
       - application/json
       responses:
@@ -166,34 +130,6 @@ paths:
             type: string
         "404":
           description: Not Found
-          schema:
-            type: string
-    patch:
-      consumes:
-      - application/json
-      description: Updates a user
-      operationId: RegisterUser
-      produces:
-      - text/plain
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: string
-        "400":
-          description: Bad Request
-          schema:
-            type: string
-        "404":
-          description: Not Found
-          schema:
-            type: string
-        "409":
-          description: Conflict
-          schema:
-            type: string
-        "500":
-          description: Internal Server Error
           schema:
             type: string
   /users:

@@ -11,8 +11,6 @@ type UserRepository interface {
 	FindAll() ([]model.User, error)
 	FindByID(id uint) (*model.User, error)
 	FindByName(name string) (*model.User, error)
-	FindByNames(name []string) ([]model.User, error)
-	Delete(user *model.User) error
 	DeleteByID(id uint) error
 	GetRolesOfUser(user *model.User) ([]model.Role, error)
 	AddRoleToUser(user *model.User, role *model.Role) error
@@ -52,16 +50,6 @@ func (r *userRepository) FindByName(name string) (*model.User, error) {
 	var user model.User
 	err := r.DB.Preload(clause.Associations).First(&user, "username = ?", name).Error
 	return &user, wrapError(err)
-}
-
-func (r *userRepository) FindByNames(names []string) ([]model.User, error) {
-	var users []model.User
-	err := r.DB.Preload(clause.Associations).Where("username IN ?", names).Find(&users).Error
-	return users, wrapError(err)
-}
-
-func (r *userRepository) Delete(user *model.User) error {
-	return wrapError(r.DB.Unscoped().Select(clause.Associations).Delete(user).Error)
 }
 
 func (r *userRepository) DeleteByID(id uint) error {

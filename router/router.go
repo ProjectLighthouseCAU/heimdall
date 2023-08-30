@@ -2,10 +2,9 @@ package router
 
 import (
 	"github.com/gofiber/fiber/v2"
-	jwtware "github.com/gofiber/jwt/v3"
-	"lighthouse.uni-kiel.de/lighthouse-api/auth"
 	"lighthouse.uni-kiel.de/lighthouse-api/config"
 	"lighthouse.uni-kiel.de/lighthouse-api/controller"
+	"lighthouse.uni-kiel.de/lighthouse-api/middleware"
 )
 
 type Router interface {
@@ -36,54 +35,50 @@ func NewRouter(app *fiber.App, uc controller.UserController, rkc controller.Regi
 
 func (r *router) Init() {
 	r.app.Post("/register", r.userController.Register)
-
+	r.app.Post("/login", r.userController.Login)
 	// r.initJWTMiddleware()
-	r.app.Use(r.casbinMiddleware)
+	if !config.GetBool("DISABLE_AUTHENTICATION", false) {
+		r.app.Use(middleware.JwtMiddleware)
+	}
+	if !config.GetBool("DISABLE_ACCESS_CONTROL", false) {
+		r.app.Use(r.casbinMiddleware)
+	}
 	r.initUserRoutes()
 	r.initRegistrationKeyRoutes()
 	r.initRoleRoutes()
 }
 
-func (r *router) initJWTMiddleware() {
-	signingKey := []byte(config.GetString("JWT_PRIVATE_KEY", auth.NewRandomString(32)))
-	r.app.Use(jwtware.New(jwtware.Config{
-		SigningKey: signingKey,
-	}))
-}
-
 func (r *router) initUserRoutes() {
-	r.app.Get("/users", r.userController.GetAll)
-	user := r.app.Group("/user")
-	user.Get("/:id", r.userController.Get)
-	user.Get("/", r.userController.Get)
-	user.Post("/", r.userController.Create)
-	user.Put("/:id", r.userController.Update)
-	user.Delete("/:id", r.userController.Delete)
-	user.Get("/:id/roles", r.userController.GetRolesOfUser)
-	user.Put("/:userid/role/:roleid", r.userController.AddRoleToUser)
-	user.Delete("/:userid/role/:roleid", r.userController.RemoveRoleFromUser)
+	users := r.app.Group("/users")
+	users.Get("", r.userController.Get)
+	users.Get("/:id<int>", r.userController.GetByID)
+	users.Post("", r.userController.Create)
+	users.Put("/:id<int>", r.userController.Update)
+	users.Delete("/:id<int>", r.userController.Delete)
+	users.Get("/:id<int>/roles", r.userController.GetRolesOfUser)
+	users.Put("/:userid<int>/roles/:roleid<int>", r.userController.AddRoleToUser)
+	users.Delete("/:userid<int>/roles/:roleid<int>", r.userController.RemoveRoleFromUser)
 }
 
 func (r *router) initRegistrationKeyRoutes() {
-	r.app.Get("/registration-keys", r.registrationKeyController.GetAll)
-	keys := r.app.Group("/registration-key")
-	keys.Get("/:id", r.registrationKeyController.Get)
-	keys.Get("/", r.registrationKeyController.Get)
-	keys.Post("/", r.registrationKeyController.Create)
-	keys.Put("/:id", r.registrationKeyController.Update)
-	keys.Delete("/:id", r.registrationKeyController.Delete)
+	keys := r.app.Group("/registration-keys")
+	keys.Get("", r.registrationKeyController.Get)
+	keys.Get("/:id<int>", r.registrationKeyController.GetByID)
+	keys.Post("", r.registrationKeyController.Create)
+	keys.Put("/:id<int>", r.registrationKeyController.Update)
+	keys.Delete("/:id<int>", r.registrationKeyController.Delete)
 }
 
 func (r *router) initRoleRoutes() {
-	r.app.Get("/roles", r.roleController.GetAll)
-	role := r.app.Group("/role")
-	role.Get("/:id", r.roleController.Get)
-	role.Get("/", r.roleController.Get)
-	role.Post("/", r.roleController.Create)
-	role.Delete("/:id", r.roleController.Delete)
-	role.Get("/:id/users", r.roleController.GetUsersOfRole)
-	role.Put("/:roleid/user/:userid", r.roleController.AddUserToRole)
-	role.Delete("/:roleid/user/:userid", r.roleController.RemoveUserFromRole)
+	roles := r.app.Group("/roles")
+	roles.Get("", r.roleController.Get)
+	roles.Get("/:id<int>", r.roleController.GetByID)
+	roles.Post("", r.roleController.Create)
+	roles.Put("/:id<int>", r.roleController.Update)
+	roles.Delete("/:id<int>", r.roleController.Delete)
+	roles.Get("/:id<int>/users", r.roleController.GetUsersOfRole)
+	roles.Put("/:roleid<int>/users/:userid<int>", r.roleController.AddUserToRole)
+	roles.Delete("/:roleid<int>/users/:userid<int>", r.roleController.RemoveUserFromRole)
 }
 
 func (r *router) ListRoutes() map[string][]string {
