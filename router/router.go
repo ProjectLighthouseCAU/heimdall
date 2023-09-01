@@ -36,7 +36,7 @@ func NewRouter(app *fiber.App, uc controller.UserController, rkc controller.Regi
 func (r *router) Init() {
 	r.app.Post("/register", r.userController.Register)
 	r.app.Post("/login", r.userController.Login)
-	r.app.Post("/")
+
 	if !config.GetBool("DISABLE_AUTHENTICATION", false) {
 		r.app.Use(middleware.JwtMiddleware)
 	}
