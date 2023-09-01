@@ -11,7 +11,7 @@ require (
 	github.com/casbin/casbin/v2 v2.77.1
 	github.com/gofiber/fiber/v2 v2.49.0
 	github.com/gofiber/jwt/v3 v3.3.10
-	github.com/swaggo/swag v1.16.1
+	github.com/swaggo/swag v1.16.2
 	golang.org/x/crypto v0.12.0
 	gorm.io/driver/postgres v1.5.2
 	gorm.io/gorm v1.25.4
@@ -26,7 +26,7 @@ require (
 	github.com/go-openapi/spec v0.20.9 // indirect
 	github.com/go-openapi/swag v0.22.4 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
-	github.com/golang-jwt/jwt/v5 v5.0.0 // indirect
+	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/google/uuid v1.3.1 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
