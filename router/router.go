@@ -36,7 +36,7 @@ func NewRouter(app *fiber.App, uc controller.UserController, rkc controller.Regi
 func (r *router) Init() {
 	r.app.Post("/register", r.userController.Register)
 	r.app.Post("/login", r.userController.Login)
-	// r.initJWTMiddleware()
+	r.app.Post("/")
 	if !config.GetBool("DISABLE_AUTHENTICATION", false) {
 		r.app.Use(middleware.JwtMiddleware)
 	}
@@ -67,6 +67,7 @@ func (r *router) initRegistrationKeyRoutes() {
 	keys.Post("", r.registrationKeyController.Create)
 	keys.Put("/:id<int>", r.registrationKeyController.Update)
 	keys.Delete("/:id<int>", r.registrationKeyController.Delete)
+	keys.Get("/:id<int>/users", r.registrationKeyController.GetUsersOfKey)
 }
 
 func (r *router) initRoleRoutes() {

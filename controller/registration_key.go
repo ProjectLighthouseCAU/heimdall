@@ -13,6 +13,7 @@ type RegistrationKeyController interface {
 	Create(c *fiber.Ctx) error
 	Update(c *fiber.Ctx) error
 	Delete(c *fiber.Ctx) error
+	GetUsersOfKey(c *fiber.Ctx) error
 }
 
 type registrationKeyController struct {
@@ -106,4 +107,16 @@ func (rkc *registrationKeyController) Delete(c *fiber.Ctx) error {
 		return unwrapAndSendError(c, err)
 	}
 	return c.SendStatus(fiber.StatusOK)
+}
+
+func (rkc *registrationKeyController) GetUsersOfKey(c *fiber.Ctx) error {
+	id, _ := c.ParamsInt("id", -1)
+	if id < 0 {
+		return c.SendStatus(fiber.StatusBadRequest)
+	}
+	key, err := rkc.registrationKeyService.GetByID(uint(id))
+	if err != nil {
+		return unwrapAndSendError(c, err)
+	}
+	return c.JSON(key.Users)
 }
