@@ -21,7 +21,9 @@ func Connect() *gorm.DB {
 	db, err := gorm.Open(postgres.New(postgres.Config{
 		DSN: dsn,
 	}), &gorm.Config{
-		TranslateError: true,
+		TranslateError:         true,
+		SkipDefaultTransaction: true,
+		PrepareStmt:            true,
 	})
 
 	if err != nil {
