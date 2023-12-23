@@ -6,10 +6,12 @@ import (
 )
 
 type UserController interface {
-	Get(c *fiber.Ctx) error
+	GetAll(c *fiber.Ctx) error
+	GetByName(c *fiber.Ctx) error
 	GetByID(c *fiber.Ctx) error
 	Create(c *fiber.Ctx) error
 	Login(c *fiber.Ctx) error
+	Logout(c *fiber.Ctx) error
 	Register(c *fiber.Ctx) error
 	Update(c *fiber.Ctx) error
 	Delete(c *fiber.Ctx) error
@@ -30,19 +32,15 @@ func NewUserController(s service.UserService) *userController {
 	}
 }
 
-//	@description	Returns a list of all users
-//	@produce		json
-//	@success		200	{array}	model.User
-//	@router			/users [get]
-func (uc *userController) Get(c *fiber.Ctx) error {
+// @description	Returns a list of all users
+// @produce		json
+// @success		200	{array}	model.User
+// @router			/users [get]
+func (uc *userController) GetAll(c *fiber.Ctx) error {
 	// query users by name
 	name := c.Query("name", "")
 	if name != "" {
-		user, err := uc.userService.GetByName(name)
-		if err != nil {
-			return unwrapAndSendError(c, err)
-		}
-		return c.JSON(user)
+		return c.Next()
 	}
 
 	// return all users
@@ -51,15 +49,26 @@ func (uc *userController) Get(c *fiber.Ctx) error {
 		return unwrapAndSendError(c, err)
 	}
 	return c.JSON(users)
-
 }
 
-//	@description	Returns a user by id
-//	@produce		json
-//	@success		200	{object}	model.User
-//	@failure		400	{object}	string	"Bad Request"
-//	@failure		404	{object}	string	"Not Found"
-//	@router			/user/{id} [get]
+func (uc *userController) GetByName(c *fiber.Ctx) error {
+	name := c.Query("name", "")
+	if name == "" {
+		return fiber.ErrBadRequest
+	}
+	user, err := uc.userService.GetByName(name)
+	if err != nil {
+		return unwrapAndSendError(c, err)
+	}
+	return c.JSON(user)
+}
+
+// @description	Returns a user by id
+// @produce		json
+// @success		200	{object}	model.User
+// @failure		400	{object}	string	"Bad Request"
+// @failure		404	{object}	string	"Not Found"
+// @router			/user/{id} [get]
 func (uc *userController) GetByID(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
@@ -81,23 +90,30 @@ func (uc *userController) Login(c *fiber.Ctx) error {
 	if err := c.BodyParser(&payload); err != nil {
 		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
 	}
-	token, err := uc.userService.Login(payload.Username, payload.Password)
+	err := uc.userService.Login(payload.Username, payload.Password, c)
 	if err != nil {
 		return unwrapAndSendError(c, err)
 	}
-	return c.JSON(token)
+	return c.SendStatus(fiber.StatusOK)
 }
 
-//	@description	Creates a user with a registration key (no extra auth needed)
-//	@id				RegisterUser
-//	@accept			json
-//	@produce		plain
-//	@success		201	{object}	string	"Created"
-//	@failure		400	{object}	string	"Bad Request"
-//	@failure		403	{object}	string	"Forbidden"
-//	@failure		500	{object}	string	"Internal Server Error"
-//	@failure		409	{object}	string	"Conflict"
-//	@router			/register [post]
+func (uc *userController) Logout(c *fiber.Ctx) error {
+	if err := uc.userService.Logout(c); err != nil {
+		return unwrapAndSendError(c, err)
+	}
+	return c.SendStatus(fiber.StatusOK)
+}
+
+// @description	Creates a user with a registration key (no extra auth needed)
+// @id				RegisterUser
+// @accept			json
+// @produce		plain
+// @success		201	{object}	string	"Created"
+// @failure		400	{object}	string	"Bad Request"
+// @failure		403	{object}	string	"Forbidden"
+// @failure		500	{object}	string	"Internal Server Error"
+// @failure		409	{object}	string	"Conflict"
+// @router			/register [post]
 func (uc *userController) Register(c *fiber.Ctx) error {
 	c.Accepts("json", "application/json", "application/x-www-form-urlencoded")
 
@@ -117,14 +133,14 @@ func (uc *userController) Register(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusCreated)
 }
 
-//	@description	Creates a user without a registration key (permissions needed)
-//	@accept			json
-//	@produce		plain
-//	@success		201	{object}	string	"Created"
-//	@failure		400	{object}	string	"Bad Request"
-//	@failure		500	{object}	string	"Internal Server Error"
-//	@failure		409	{object}	string	"Conflict"
-//	@router			/user [post]
+// @description	Creates a user without a registration key (permissions needed)
+// @accept			json
+// @produce		plain
+// @success		201	{object}	string	"Created"
+// @failure		400	{object}	string	"Bad Request"
+// @failure		500	{object}	string	"Internal Server Error"
+// @failure		409	{object}	string	"Conflict"
+// @router			/user [post]
 func (uc *userController) Create(c *fiber.Ctx) error {
 	c.Accepts("json", "application/json", "application/x-www-form-urlencoded")
 	payload := struct {
@@ -165,12 +181,12 @@ func (uc *userController) Update(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-//	@description	Creates a user with a registration key (no extra auth needed)
-//	@id				RegisterUser
-//	@produce		plain
-//	@success		200	{object}	string	"OK"
-//	@failure		404	{object}	string	"Not Found"
-//	@router			/user/{id} [delete]
+// @description	Creates a user with a registration key (no extra auth needed)
+// @id				RegisterUser
+// @produce		plain
+// @success		200	{object}	string	"OK"
+// @failure		404	{object}	string	"Not Found"
+// @router			/user/{id} [delete]
 func (uc *userController) Delete(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {

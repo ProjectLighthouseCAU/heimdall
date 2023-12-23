@@ -3,8 +3,8 @@ package service
 import (
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
-	"lighthouse.uni-kiel.de/lighthouse-api/config"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/session"
 	"lighthouse.uni-kiel.de/lighthouse-api/crypto"
 	"lighthouse.uni-kiel.de/lighthouse-api/model"
 	"lighthouse.uni-kiel.de/lighthouse-api/repository"
@@ -14,11 +14,15 @@ type UserService interface {
 	GetAll() ([]model.User, error)
 	GetByID(id uint) (*model.User, error)
 	GetByName(name string) (*model.User, error)
-	Login(username, password string) (*model.Token, error)
+
+	Login(username, password string, c *fiber.Ctx) error
+	Logout(c *fiber.Ctx) error
 	Register(username, password, email, registrationKey string) error
+
 	Create(username, password, email string) error
 	Update(id uint, username, password, email string) error
 	DeleteByID(id uint) error
+
 	GetRolesOfUser(userid uint) ([]model.Role, error)
 	AddRoleToUser(userid, roleid uint) error
 	RemoveRoleFromUser(userid, roleid uint) error
@@ -28,15 +32,17 @@ type userService struct {
 	userRepository            repository.UserRepository
 	registrationKeyRepository repository.RegistrationKeyRepository
 	roleRepository            repository.RoleRepository
+	sessionStore              *session.Store
 }
 
 var _ UserService = (*userService)(nil) // compile-time interface check
 
-func NewUserService(ur repository.UserRepository, rkr repository.RegistrationKeyRepository, rr repository.RoleRepository) *userService {
+func NewUserService(ur repository.UserRepository, rkr repository.RegistrationKeyRepository, rr repository.RoleRepository, s *session.Store) *userService {
 	return &userService{
 		userRepository:            ur,
 		registrationKeyRepository: rkr,
 		roleRepository:            rr,
+		sessionStore:              s,
 	}
 }
 
@@ -52,33 +58,49 @@ func (s *userService) GetByName(name string) (*model.User, error) {
 	return s.userRepository.FindByName(name)
 }
 
-func (s *userService) Login(username, password string) (*model.Token, error) {
+func (s *userService) Login(username, password string, c *fiber.Ctx) error {
+	session, err := s.sessionStore.Get(c)
+	if err != nil {
+		return model.InternalServerError{Message: "Could not create session", Err: err}
+	}
+	_, ok := session.Get("userid").(uint)
+	if ok {
+		return nil // already logged in
+	}
 	user, err := s.userRepository.FindByName(username)
 	// don't leak if username exists -> both cases return the same response
 	if err != nil {
-		return nil, model.UnauthorizedError{Message: "Invalid credentials", Err: nil}
+		return model.UnauthorizedError{Message: "Invalid credentials", Err: nil}
 	}
 	if !crypto.PasswordMatchesHash(password, user.Password) {
-		return nil, model.UnauthorizedError{Message: "Invalid credentials", Err: nil}
+		return model.UnauthorizedError{Message: "Invalid credentials", Err: nil}
 	}
+	session.Set("userid", user.ID)
+	session.Save()
+
+	now := time.Now()
+	user.LastLogin = &now
+	s.userRepository.Save(user)
+
+	// JWT
 	// using JWT for now
 	// TODO: maybe switch to normal session cookies
-	now := time.Now()
-	claims := jwt.RegisteredClaims{
-		// Issuer:    "heimdall",
-		Subject: username,
-		// Audience:  []string{"heimdall", "beacon"},
-		ExpiresAt: jwt.NewNumericDate(now.Add(config.GetDuration("JWT_VALID_DURATION", 1*time.Hour))),
-		// NotBefore: jwt.NewNumericDate(now),
-		// IssuedAt:  jwt.NewNumericDate(now),
-	}
+	// now := time.Now()
+	// claims := jwt.RegisteredClaims{
+	// 	// Issuer:    "heimdall",
+	// 	Subject: username,
+	// 	// Audience:  []string{"heimdall", "beacon"},
+	// 	ExpiresAt: jwt.NewNumericDate(now.Add(config.GetDuration("JWT_VALID_DURATION", 1*time.Hour))),
+	// 	// NotBefore: jwt.NewNumericDate(now),
+	// 	// IssuedAt:  jwt.NewNumericDate(now),
+	// }
 	// only subject and expires_at: 129 characters
 	// all claims: 235 characters
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenStr, err := token.SignedString(crypto.JwtPrivateKey)
-	if err != nil {
-		return nil, model.InternalServerError{Message: "Could not sign JWT", Err: err}
-	}
+	// token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	// tokenStr, err := token.SignedString(crypto.JwtPrivateKey)
+	// if err != nil {
+	// 	return nil, model.InternalServerError{Message: "Could not sign JWT", Err: err}
+	// }
 
 	// token, err = jwt.ParseWithClaims(tokenStr, &jwt.RegisteredClaims{}, func(token *jwt.Token) (interface{}, error) {
 	// 	return crypto.JwtPrivateKey, nil
@@ -88,7 +110,18 @@ func (s *userService) Login(username, password string) (*model.Token, error) {
 	// } else {
 	// 	fmt.Println(err)
 	// }
-	return &model.Token{Token: tokenStr}, nil
+	return nil
+}
+
+func (s *userService) Logout(c *fiber.Ctx) error {
+	session, err := s.sessionStore.Get(c)
+	if err != nil {
+		return model.InternalServerError{Message: "Could not get session", Err: err}
+	}
+	if err = session.Destroy(); err != nil {
+		return model.InternalServerError{Message: "Could not destroy session", Err: err}
+	}
+	return nil
 }
 
 func validateUser(username, password, email string) error {

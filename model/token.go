@@ -7,9 +7,10 @@ package model
 // 	// IssuedAt  time.Time --> gorm.Model.CreatedAt
 // 	ExpiresAt time.Time `gorm:"not null" json:"expires_at"`
 
-// 	UserID uint // foreign key
 // }
 
 type Token struct {
+	// Model
 	Token string `json:"token"`
+	// UserID uint   // foreign key
 }

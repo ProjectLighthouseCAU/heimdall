@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"runtime"
 	"strings"
 	"time"
 
@@ -13,8 +14,12 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/monitor"
 	"github.com/gofiber/fiber/v2/middleware/pprof"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v2/middleware/session"
+	"github.com/gofiber/fiber/v2/utils"
+	"github.com/gofiber/storage/redis"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"lighthouse.uni-kiel.de/lighthouse-api/config"
 	"lighthouse.uni-kiel.de/lighthouse-api/controller"
 	"lighthouse.uni-kiel.de/lighthouse-api/database"
 	"lighthouse.uni-kiel.de/lighthouse-api/middleware"
@@ -59,6 +64,25 @@ func main() {
 	log.Println("	Connecting to database")
 	db := database.Connect()
 	log.Println("	Connected to database")
+
+	storage := redis.New(redis.Config{
+		Host:      config.GetString("REDIS_HOST", "127.0.0.1"),
+		Port:      config.GetInt("REDIS_PORT", 6379),
+		Username:  config.GetString("REDIS_USER", ""),
+		Password:  config.GetString("REDIS_PASSWORD", ""),
+		Database:  0,
+		Reset:     false,
+		TLSConfig: nil,
+		PoolSize:  10 * runtime.GOMAXPROCS(0),
+	})
+
+	store := session.New(session.Config{
+		Storage:      storage,
+		Expiration:   24 * time.Hour,
+		KeyLookup:    "cookie:session_id",
+		KeyGenerator: utils.UUIDv4,
+	})
+
 	userRepository := repository.NewUserRepository(db)
 	registrationKeyRepository := repository.NewRegistrationKeyRepository(db)
 	roleRepository := repository.NewRoleRepository(db)
@@ -77,6 +101,7 @@ func main() {
 		userRepository,
 		registrationKeyRepository,
 		roleRepository,
+		store,
 	)
 	registrationKeyService := service.NewRegistrationKeyService(
 		registrationKeyRepository,
@@ -99,6 +124,7 @@ func main() {
 	casbinMiddleware := middleware.NewCasbinMiddleware(
 		accessControlService,
 	)
+	sessionMiddleware := middleware.NewSessionMiddleware(store, userService)
 
 	routa := router.NewRouter(
 		app,
@@ -106,6 +132,7 @@ func main() {
 		registrationKeyController,
 		roleController,
 		casbinMiddleware,
+		sessionMiddleware,
 	)
 
 	userRepository.Migrate()

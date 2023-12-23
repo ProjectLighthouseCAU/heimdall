@@ -2,16 +2,14 @@ package model
 
 import (
 	"time"
-
-	"gorm.io/gorm"
 )
 
 // Copy of gorm.Model with json tags
 type Model struct {
-	ID        uint           `gorm:"primarykey" json:"id"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"` // marshal this or filter when using soft delete (currently using hard delete)
+	ID        uint      `gorm:"primarykey" json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	// DeletedAt gorm.DeletedAt `gorm:"index" json:"-"` // marshal this or filter when using soft delete (currently using hard delete)
 }
 
 // User
