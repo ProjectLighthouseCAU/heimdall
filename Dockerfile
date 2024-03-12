@@ -2,7 +2,7 @@
 
 ### BUILD IMAGE ###
 
-FROM golang:1.21-alpine AS compile-stage
+FROM --platform=$BUILDPLATFORM golang:1.21-alpine AS compile-stage
 
 # git needed by go get / go build
 RUN apk add git
@@ -30,9 +30,9 @@ RUN chmod -R +rwx /app
 
 # build the application
 ARG CGO_ENABLED=0
-ARG GOOS=linux
+ARG TARGETOS TARGETARCH
 # TODO: find out why VCS stamping errors here
-RUN go build -a -installsuffix cgo -buildvcs=false -o auth-api .
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -a -installsuffix cgo -buildvcs=false -o auth-api .
 
 ### RUNTIME IMAGE ###
 
