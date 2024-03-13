@@ -31,8 +31,7 @@ RUN chmod -R +rwx /app
 # build the application
 ARG CGO_ENABLED=0
 ARG TARGETOS TARGETARCH
-# TODO: find out why VCS stamping errors here
-RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -a -installsuffix cgo -buildvcs=false -o auth-api .
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -a -installsuffix cgo -o auth-api .
 
 ### RUNTIME IMAGE ###
 
