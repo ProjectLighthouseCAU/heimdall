@@ -1,5 +1,7 @@
 # Heimdall
 
+[![CI/CD](https://github.com/ProjectLighthouseCAU/heimdall/actions/workflows/ci.yml/badge.svg)](https://github.com/ProjectLighthouseCAU/heimdall/actions/workflows/ci.yml)
+
 This service handles authentication and authorization/access control for users providing a REST API as its interface. The name might be inspired by a legacy codebase.
 
 ## Roadmap:
