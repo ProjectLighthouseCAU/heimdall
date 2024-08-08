@@ -86,16 +86,16 @@ func main() {
 	registrationKeyRepository := repository.NewRegistrationKeyRepository(db)
 	roleRepository := repository.NewRoleRepository(db)
 
-	roleManager := service.NewRoleManager(
-		roleRepository,
-		userRepository,
-	)
-	accessControlService := service.NewAccessControlService(
-		db,
-		userRepository,
-		roleRepository,
-		roleManager,
-	)
+	// roleManager := service.NewRoleManager(
+	// 	roleRepository,
+	// 	userRepository,
+	// )
+	// accessControlService := service.NewAccessControlService(
+	// 	db,
+	// 	userRepository,
+	// 	roleRepository,
+	// 	roleManager,
+	// )
 	userService := service.NewUserService(
 		userRepository,
 		registrationKeyRepository,
@@ -120,9 +120,9 @@ func main() {
 		roleService,
 	)
 
-	casbinMiddleware := middleware.NewCasbinMiddleware(
-		accessControlService,
-	)
+	// casbinMiddleware := middleware.NewCasbinMiddleware(
+	// 	accessControlService,
+	// )
 	sessionMiddleware := middleware.NewSessionMiddleware(store, userService)
 
 	routa := router.NewRouter(
@@ -130,7 +130,7 @@ func main() {
 		userController,
 		registrationKeyController,
 		roleController,
-		casbinMiddleware,
+		// casbinMiddleware,
 		sessionMiddleware,
 	)
 

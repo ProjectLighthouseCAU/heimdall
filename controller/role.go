@@ -5,30 +5,17 @@ import (
 	"lighthouse.uni-kiel.de/lighthouse-api/service"
 )
 
-type RoleController interface {
-	Get(c *fiber.Ctx) error
-	GetByID(c *fiber.Ctx) error
-	Update(c *fiber.Ctx) error
-	Create(c *fiber.Ctx) error
-	Delete(c *fiber.Ctx) error
-	GetUsersOfRole(c *fiber.Ctx) error
-	AddUserToRole(c *fiber.Ctx) error
-	RemoveUserFromRole(c *fiber.Ctx) error
-}
-
-type roleController struct {
+type RoleController struct {
 	roleService service.RoleService
 }
 
-var _ RoleController = (*roleController)(nil) // compile-time interface check
-
-func NewRoleController(s service.RoleService) *roleController {
-	return &roleController{
+func NewRoleController(s service.RoleService) RoleController {
+	return RoleController{
 		roleService: s,
 	}
 }
 
-func (rc *roleController) Get(c *fiber.Ctx) error {
+func (rc *RoleController) Get(c *fiber.Ctx) error {
 	// query roles by name
 	name := c.Query("name", "")
 	if name != "" {
@@ -46,7 +33,7 @@ func (rc *roleController) Get(c *fiber.Ctx) error {
 	return c.JSON(roles)
 }
 
-func (rc *roleController) GetByID(c *fiber.Ctx) error {
+func (rc *RoleController) GetByID(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
@@ -58,7 +45,7 @@ func (rc *roleController) GetByID(c *fiber.Ctx) error {
 	return c.JSON(role)
 }
 
-func (rc *roleController) Create(c *fiber.Ctx) error {
+func (rc *RoleController) Create(c *fiber.Ctx) error {
 	c.Accepts("json", "application/json", "application/x-www-form-urlencoded")
 	payload := struct {
 		Name string `json:"name"`
@@ -73,7 +60,7 @@ func (rc *roleController) Create(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusCreated)
 }
 
-func (rc *roleController) Update(c *fiber.Ctx) error {
+func (rc *RoleController) Update(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
@@ -91,7 +78,7 @@ func (rc *roleController) Update(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (rc *roleController) Delete(c *fiber.Ctx) error {
+func (rc *RoleController) Delete(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
@@ -103,7 +90,7 @@ func (rc *roleController) Delete(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (rc *roleController) GetUsersOfRole(c *fiber.Ctx) error {
+func (rc *RoleController) GetUsersOfRole(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
@@ -115,7 +102,7 @@ func (rc *roleController) GetUsersOfRole(c *fiber.Ctx) error {
 	return c.JSON(users)
 }
 
-func (rc *roleController) AddUserToRole(c *fiber.Ctx) error {
+func (rc *RoleController) AddUserToRole(c *fiber.Ctx) error {
 	roleid, _ := c.ParamsInt("roleid", -1)
 	userid, _ := c.ParamsInt("userid", -1)
 	if roleid < 0 || userid < 0 {
@@ -128,7 +115,7 @@ func (rc *roleController) AddUserToRole(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (rc *roleController) RemoveUserFromRole(c *fiber.Ctx) error {
+func (rc *RoleController) RemoveUserFromRole(c *fiber.Ctx) error {
 	roleid, _ := c.ParamsInt("roleid", -1)
 	userid, _ := c.ParamsInt("userid", -1)
 	if roleid < 0 || userid < 0 {

@@ -32,6 +32,10 @@ func calculateOptimalCost() int {
 		cost += 1
 		duration *= 2
 	}
+	// the minimum hashing cost should be 10 for security reasons
+	if cost < 10 {
+		cost = 10
+	}
 	log.Printf("	Setting optimal bcrypt hashing cost factor to: %d\n", cost)
 	return cost
 }

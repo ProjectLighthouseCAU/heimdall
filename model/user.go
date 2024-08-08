@@ -2,10 +2,6 @@ package model
 
 import "time"
 
-// TODO: last login date, implement!
-// DisplayName string `json:"display_name"` // not necessary, just make username changeable (if not taken)
-// Tokens            []Token `gorm:"constraint:OnDelete:CASCADE" json:"tokens,omitempty"`
-// json:"-" -> skipped at json encode
 type User struct {
 	Model
 

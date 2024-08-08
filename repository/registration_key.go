@@ -6,58 +6,46 @@ import (
 	"lighthouse.uni-kiel.de/lighthouse-api/model"
 )
 
-type RegistrationKeyRepository interface {
-	Save(key *model.RegistrationKey) error
-	FindAll() ([]model.RegistrationKey, error)
-	FindByID(id uint) (*model.RegistrationKey, error)
-	FindByKey(key string) (*model.RegistrationKey, error)
-	Delete(key *model.RegistrationKey) error
-	DeleteByID(id uint) error
-	Migrate() error
-}
-
-type registrationKeyRepository struct {
+type RegistrationKeyRepository struct {
 	DB *gorm.DB
 }
 
-var _ RegistrationKeyRepository = (*registrationKeyRepository)(nil) // compile-time interface check
-
-func NewRegistrationKeyRepository(db *gorm.DB) *registrationKeyRepository {
-	return &registrationKeyRepository{
+func NewRegistrationKeyRepository(db *gorm.DB) RegistrationKeyRepository {
+	return RegistrationKeyRepository{
 		DB: db,
 	}
 }
 
-func (r *registrationKeyRepository) Save(key *model.RegistrationKey) error {
+func (r *RegistrationKeyRepository) Save(key *model.RegistrationKey) error {
 	return wrapError(r.DB.Save(key).Error)
 }
 
-func (r *registrationKeyRepository) FindAll() ([]model.RegistrationKey, error) {
+func (r *RegistrationKeyRepository) FindAll() ([]model.RegistrationKey, error) {
 	var keys []model.RegistrationKey
 	err := r.DB.Find(&keys).Error
 	return keys, wrapError(err)
 }
 
-func (r *registrationKeyRepository) FindByID(id uint) (*model.RegistrationKey, error) {
+func (r *RegistrationKeyRepository) FindByID(id uint) (*model.RegistrationKey, error) {
 	var key model.RegistrationKey
 	err := r.DB.Preload(clause.Associations).First(&key, id).Error
 	return &key, wrapError(err)
 }
 
-func (r *registrationKeyRepository) FindByKey(key string) (*model.RegistrationKey, error) {
+func (r *RegistrationKeyRepository) FindByKey(key string) (*model.RegistrationKey, error) {
 	var rkey model.RegistrationKey
 	err := r.DB.Preload(clause.Associations).First(&rkey, "key = ?", key).Error
 	return &rkey, wrapError(err)
 }
 
-func (r *registrationKeyRepository) Delete(key *model.RegistrationKey) error {
+func (r *RegistrationKeyRepository) Delete(key *model.RegistrationKey) error {
 	return wrapError(r.DB.Unscoped().Delete(key).Error)
 }
 
-func (r *registrationKeyRepository) DeleteByID(id uint) error {
+func (r *RegistrationKeyRepository) DeleteByID(id uint) error {
 	return wrapError(r.DB.Unscoped().Delete(&model.RegistrationKey{}, id).Error)
 }
 
-func (r *registrationKeyRepository) Migrate() error {
+func (r *RegistrationKeyRepository) Migrate() error {
 	return r.DB.AutoMigrate(&model.RegistrationKey{})
 }

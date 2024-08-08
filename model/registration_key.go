@@ -5,8 +5,7 @@ import "time"
 // To manually expire: set ExpiresAt to now
 // Permanent overrides ExpiresAt
 // TODO: maybe add #uses to have limited users per key (e.g. only one)
-// TODO: maybe add groups that are assigned on registration
-// TODO: maybe add permissions that are assigned on registration
+// TODO: maybe add roles that are assigned on registration
 type RegistrationKey struct {
 	Model
 

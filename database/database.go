@@ -17,7 +17,7 @@ func Connect() *gorm.DB {
 		config.GetInt("DB_PORT", 5432),
 		config.GetString("DB_USER", "postgres"),
 		config.GetString("DB_PASS", "postgres"),
-		config.GetString("DB_NAME", "lighthouse"))
+		config.GetString("DB_NAME", "heimdall"))
 
 	db, err := gorm.Open(postgres.New(postgres.Config{
 		DSN: dsn,

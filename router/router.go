@@ -7,44 +7,28 @@ import (
 	"lighthouse.uni-kiel.de/lighthouse-api/middleware"
 )
 
-type Router interface {
-	Init()
-}
-
-type router struct {
+type Router struct {
 	app                       *fiber.App
 	userController            controller.UserController
 	registrationKeyController controller.RegistrationKeyController
 	roleController            controller.RoleController
-	casbinMiddleware          fiber.Handler
 	sessionMiddleware         fiber.Handler
 }
 
-var (
-	_ Router = (*router)(nil) // compile-time interface check
-)
-
-func NewRouter(app *fiber.App, uc controller.UserController, rkc controller.RegistrationKeyController, rc controller.RoleController, cm fiber.Handler, s fiber.Handler) *router {
-	return &router{
+func NewRouter(app *fiber.App, uc controller.UserController, rkc controller.RegistrationKeyController, rc controller.RoleController, sessionMiddleware fiber.Handler) Router {
+	return Router{
 		app:                       app,
 		userController:            uc,
 		registrationKeyController: rkc,
 		roleController:            rc,
-		casbinMiddleware:          cm,
-		sessionMiddleware:         s,
+		sessionMiddleware:         sessionMiddleware,
 	}
 }
 
-func (r *router) Init() {
+func (r *Router) Init() {
 	r.app.Post("/register", r.userController.Register)
 	r.app.Post("/login", r.userController.Login)
 
-	// if !config.GetBool("DISABLE_AUTHENTICATION", false) {
-	// 	r.app.Use(middleware.JwtMiddleware)
-	// }
-	// if !config.GetBool("DISABLE_ACCESS_CONTROL", false) {
-	// 	r.app.Use(r.casbinMiddleware)
-	// }
 	r.app.Use(r.sessionMiddleware)
 	r.app.Post("/logout", r.userController.Logout)
 	r.initUserRoutes()
@@ -72,7 +56,7 @@ user:
 
 var admin = config.GetString("ADMIN_ROLENAME", "admin")
 
-func (r *router) initUserRoutes() {
+func (r *Router) initUserRoutes() {
 	users := r.app.Group("/users")
 	users.Get("", r.userController.GetAll, middleware.AllowRole(admin), r.userController.GetByName)
 	users.Get("/:id<int>", middleware.AllowRoleOrOwnUserId(admin, "id"), r.userController.GetByID)
@@ -84,7 +68,7 @@ func (r *router) initUserRoutes() {
 	users.Delete("/:userid<int>/roles/:roleid<int>", middleware.AllowRole(admin), r.userController.RemoveRoleFromUser)
 }
 
-func (r *router) initRegistrationKeyRoutes() {
+func (r *Router) initRegistrationKeyRoutes() {
 	keys := r.app.Group("/registration-keys", middleware.AllowRole(admin))
 	keys.Get("", r.registrationKeyController.Get)
 	keys.Get("/:id<int>", r.registrationKeyController.GetByID)
@@ -94,7 +78,7 @@ func (r *router) initRegistrationKeyRoutes() {
 	keys.Get("/:id<int>/users", r.registrationKeyController.GetUsersOfKey)
 }
 
-func (r *router) initRoleRoutes() {
+func (r *Router) initRoleRoutes() {
 	roles := r.app.Group("/roles", middleware.AllowRole(admin))
 	roles.Get("", r.roleController.Get)
 	roles.Get("/:id<int>", r.roleController.GetByID)
@@ -106,7 +90,7 @@ func (r *router) initRoleRoutes() {
 	roles.Delete("/:roleid<int>/users/:userid<int>", r.roleController.RemoveUserFromRole)
 }
 
-func (r *router) ListRoutes() map[string][]string {
+func (r *Router) ListRoutes() map[string][]string {
 	endpoints := make(map[string][]string)
 	for _, group := range r.app.Stack() {
 		for _, endpoint := range group {
