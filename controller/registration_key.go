@@ -7,28 +7,17 @@ import (
 	"lighthouse.uni-kiel.de/lighthouse-api/service"
 )
 
-type RegistrationKeyController interface {
-	Get(c *fiber.Ctx) error
-	GetByID(c *fiber.Ctx) error
-	Create(c *fiber.Ctx) error
-	Update(c *fiber.Ctx) error
-	Delete(c *fiber.Ctx) error
-	GetUsersOfKey(c *fiber.Ctx) error
-}
-
-type registrationKeyController struct {
+type RegistrationKeyController struct {
 	registrationKeyService service.RegistrationKeyService
 }
 
-var _ RegistrationKeyController = (*registrationKeyController)(nil) // compile-time interface check
-
-func NewRegistrationKeyController(r service.RegistrationKeyService) *registrationKeyController {
-	return &registrationKeyController{
+func NewRegistrationKeyController(r service.RegistrationKeyService) RegistrationKeyController {
+	return RegistrationKeyController{
 		registrationKeyService: r,
 	}
 }
 
-func (rkc *registrationKeyController) Get(c *fiber.Ctx) error {
+func (rkc *RegistrationKeyController) Get(c *fiber.Ctx) error {
 	// query registration keys by key (string value)
 	keyStr := c.Query("key", "")
 	if keyStr != "" {
@@ -46,7 +35,7 @@ func (rkc *registrationKeyController) Get(c *fiber.Ctx) error {
 	return c.JSON(keys)
 }
 
-func (rkc *registrationKeyController) GetByID(c *fiber.Ctx) error {
+func (rkc *RegistrationKeyController) GetByID(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
@@ -58,7 +47,7 @@ func (rkc *registrationKeyController) GetByID(c *fiber.Ctx) error {
 	return c.JSON(key)
 }
 
-func (rkc *registrationKeyController) Create(c *fiber.Ctx) error {
+func (rkc *RegistrationKeyController) Create(c *fiber.Ctx) error {
 	c.Accepts("json", "application/json", "application/x-www-form-urlencoded")
 	payload := struct {
 		Key         string    `json:"key"`
@@ -76,7 +65,7 @@ func (rkc *registrationKeyController) Create(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusCreated)
 }
 
-func (rkc *registrationKeyController) Update(c *fiber.Ctx) error {
+func (rkc *RegistrationKeyController) Update(c *fiber.Ctx) error {
 	c.Accepts("json", "application/json", "application/x-www-form-urlencoded")
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
@@ -97,7 +86,7 @@ func (rkc *registrationKeyController) Update(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (rkc *registrationKeyController) Delete(c *fiber.Ctx) error {
+func (rkc *RegistrationKeyController) Delete(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
@@ -109,7 +98,7 @@ func (rkc *registrationKeyController) Delete(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (rkc *registrationKeyController) GetUsersOfKey(c *fiber.Ctx) error {
+func (rkc *RegistrationKeyController) GetUsersOfKey(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)

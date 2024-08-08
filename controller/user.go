@@ -5,29 +5,12 @@ import (
 	"lighthouse.uni-kiel.de/lighthouse-api/service"
 )
 
-type UserController interface {
-	GetAll(c *fiber.Ctx) error
-	GetByName(c *fiber.Ctx) error
-	GetByID(c *fiber.Ctx) error
-	Create(c *fiber.Ctx) error
-	Login(c *fiber.Ctx) error
-	Logout(c *fiber.Ctx) error
-	Register(c *fiber.Ctx) error
-	Update(c *fiber.Ctx) error
-	Delete(c *fiber.Ctx) error
-	GetRolesOfUser(c *fiber.Ctx) error
-	AddRoleToUser(c *fiber.Ctx) error
-	RemoveRoleFromUser(c *fiber.Ctx) error
-}
-
-type userController struct {
+type UserController struct {
 	userService service.UserService
 }
 
-var _ UserController = (*userController)(nil) // compile-time interface check
-
-func NewUserController(s service.UserService) *userController {
-	return &userController{
+func NewUserController(s service.UserService) UserController {
+	return UserController{
 		userService: s,
 	}
 }
@@ -36,7 +19,7 @@ func NewUserController(s service.UserService) *userController {
 // @produce		json
 // @success		200	{array}	model.User
 // @router			/users [get]
-func (uc *userController) GetAll(c *fiber.Ctx) error {
+func (uc *UserController) GetAll(c *fiber.Ctx) error {
 	// query users by name
 	name := c.Query("name", "")
 	if name != "" {
@@ -51,7 +34,7 @@ func (uc *userController) GetAll(c *fiber.Ctx) error {
 	return c.JSON(users)
 }
 
-func (uc *userController) GetByName(c *fiber.Ctx) error {
+func (uc *UserController) GetByName(c *fiber.Ctx) error {
 	name := c.Query("name", "")
 	if name == "" {
 		return fiber.ErrBadRequest
@@ -69,7 +52,7 @@ func (uc *userController) GetByName(c *fiber.Ctx) error {
 // @failure		400	{object}	string	"Bad Request"
 // @failure		404	{object}	string	"Not Found"
 // @router			/user/{id} [get]
-func (uc *userController) GetByID(c *fiber.Ctx) error {
+func (uc *UserController) GetByID(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
@@ -81,7 +64,7 @@ func (uc *userController) GetByID(c *fiber.Ctx) error {
 	return c.JSON(user)
 }
 
-func (uc *userController) Login(c *fiber.Ctx) error {
+func (uc *UserController) Login(c *fiber.Ctx) error {
 	c.Accepts("json", "application/json", "application/x-www-form-urlencoded")
 	payload := struct {
 		Username string `json:"username"`
@@ -97,7 +80,7 @@ func (uc *userController) Login(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (uc *userController) Logout(c *fiber.Ctx) error {
+func (uc *UserController) Logout(c *fiber.Ctx) error {
 	if err := uc.userService.Logout(c); err != nil {
 		return unwrapAndSendError(c, err)
 	}
@@ -114,7 +97,7 @@ func (uc *userController) Logout(c *fiber.Ctx) error {
 // @failure		500	{object}	string	"Internal Server Error"
 // @failure		409	{object}	string	"Conflict"
 // @router			/register [post]
-func (uc *userController) Register(c *fiber.Ctx) error {
+func (uc *UserController) Register(c *fiber.Ctx) error {
 	c.Accepts("json", "application/json", "application/x-www-form-urlencoded")
 
 	payload := struct {
@@ -141,7 +124,7 @@ func (uc *userController) Register(c *fiber.Ctx) error {
 // @failure		500	{object}	string	"Internal Server Error"
 // @failure		409	{object}	string	"Conflict"
 // @router			/user [post]
-func (uc *userController) Create(c *fiber.Ctx) error {
+func (uc *UserController) Create(c *fiber.Ctx) error {
 	c.Accepts("json", "application/json", "application/x-www-form-urlencoded")
 	payload := struct {
 		Username string `json:"username"`
@@ -159,7 +142,7 @@ func (uc *userController) Create(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusCreated)
 }
 
-func (uc *userController) Update(c *fiber.Ctx) error {
+func (uc *UserController) Update(c *fiber.Ctx) error {
 	c.Accepts("json", "application/json", "application/x-www-form-urlencoded")
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
@@ -187,7 +170,7 @@ func (uc *userController) Update(c *fiber.Ctx) error {
 // @success		200	{object}	string	"OK"
 // @failure		404	{object}	string	"Not Found"
 // @router			/user/{id} [delete]
-func (uc *userController) Delete(c *fiber.Ctx) error {
+func (uc *UserController) Delete(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
@@ -199,7 +182,7 @@ func (uc *userController) Delete(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (uc *userController) GetRolesOfUser(c *fiber.Ctx) error {
+func (uc *UserController) GetRolesOfUser(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
@@ -211,7 +194,7 @@ func (uc *userController) GetRolesOfUser(c *fiber.Ctx) error {
 	return c.JSON(roles)
 }
 
-func (uc *userController) AddRoleToUser(c *fiber.Ctx) error {
+func (uc *UserController) AddRoleToUser(c *fiber.Ctx) error {
 	userid, _ := c.ParamsInt("userid", -1)
 	roleid, _ := c.ParamsInt("roleid", -1)
 	if userid < 0 || roleid < 0 {
@@ -224,7 +207,7 @@ func (uc *userController) AddRoleToUser(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (uc *userController) RemoveRoleFromUser(c *fiber.Ctx) error {
+func (uc *UserController) RemoveRoleFromUser(c *fiber.Ctx) error {
 	userid, _ := c.ParamsInt("userid", -1)
 	roleid, _ := c.ParamsInt("roleid", -1)
 	if userid < 0 || roleid < 0 {

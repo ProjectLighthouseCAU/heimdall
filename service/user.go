@@ -10,35 +10,15 @@ import (
 	"lighthouse.uni-kiel.de/lighthouse-api/repository"
 )
 
-type UserService interface {
-	GetAll() ([]model.User, error)
-	GetByID(id uint) (*model.User, error)
-	GetByName(name string) (*model.User, error)
-
-	Login(username, password string, c *fiber.Ctx) error
-	Logout(c *fiber.Ctx) error
-	Register(username, password, email, registrationKey string) error
-
-	Create(username, password, email string) error
-	Update(id uint, username, password, email string) error
-	DeleteByID(id uint) error
-
-	GetRolesOfUser(userid uint) ([]model.Role, error)
-	AddRoleToUser(userid, roleid uint) error
-	RemoveRoleFromUser(userid, roleid uint) error
-}
-
-type userService struct {
+type UserService struct {
 	userRepository            repository.UserRepository
 	registrationKeyRepository repository.RegistrationKeyRepository
 	roleRepository            repository.RoleRepository
 	sessionStore              *session.Store
 }
 
-var _ UserService = (*userService)(nil) // compile-time interface check
-
-func NewUserService(ur repository.UserRepository, rkr repository.RegistrationKeyRepository, rr repository.RoleRepository, s *session.Store) *userService {
-	return &userService{
+func NewUserService(ur repository.UserRepository, rkr repository.RegistrationKeyRepository, rr repository.RoleRepository, s *session.Store) UserService {
+	return UserService{
 		userRepository:            ur,
 		registrationKeyRepository: rkr,
 		roleRepository:            rr,
@@ -46,19 +26,19 @@ func NewUserService(ur repository.UserRepository, rkr repository.RegistrationKey
 	}
 }
 
-func (s *userService) GetAll() ([]model.User, error) {
+func (s *UserService) GetAll() ([]model.User, error) {
 	return s.userRepository.FindAll()
 }
 
-func (s *userService) GetByID(id uint) (*model.User, error) {
+func (s *UserService) GetByID(id uint) (*model.User, error) {
 	return s.userRepository.FindByID(id)
 }
 
-func (s *userService) GetByName(name string) (*model.User, error) {
+func (s *UserService) GetByName(name string) (*model.User, error) {
 	return s.userRepository.FindByName(name)
 }
 
-func (s *userService) Login(username, password string, c *fiber.Ctx) error {
+func (s *UserService) Login(username, password string, c *fiber.Ctx) error {
 	session, err := s.sessionStore.Get(c)
 	if err != nil {
 		return model.InternalServerError{Message: "Could not create session", Err: err}
@@ -113,7 +93,7 @@ func (s *userService) Login(username, password string, c *fiber.Ctx) error {
 	return nil
 }
 
-func (s *userService) Logout(c *fiber.Ctx) error {
+func (s *UserService) Logout(c *fiber.Ctx) error {
 	session, err := s.sessionStore.Get(c)
 	if err != nil {
 		return model.InternalServerError{Message: "Could not get session", Err: err}
@@ -137,7 +117,7 @@ func validateUser(username, password, email string) error {
 	return nil
 }
 
-func (s *userService) checkIfUserExists(username string) error {
+func (s *UserService) checkIfUserExists(username string) error {
 	_, err := s.userRepository.FindByName(username)
 	if err == nil {
 		return model.ConflictError{Message: "Username already exists"}
@@ -145,7 +125,7 @@ func (s *userService) checkIfUserExists(username string) error {
 	return nil
 }
 
-func (s *userService) Register(username, password, email, registrationKey string) error {
+func (s *UserService) Register(username, password, email, registrationKey string) error {
 	key, err := s.registrationKeyRepository.FindByKey(registrationKey)
 	if err != nil {
 		switch err.(type) {
@@ -180,7 +160,7 @@ func (s *userService) Register(username, password, email, registrationKey string
 	return s.userRepository.Save(&user)
 }
 
-func (s *userService) Create(username, password, email string) error {
+func (s *UserService) Create(username, password, email string) error {
 	if err := validateUser(username, password, email); err != nil {
 		return err
 	}
@@ -200,7 +180,7 @@ func (s *userService) Create(username, password, email string) error {
 	return s.userRepository.Save(&user)
 }
 
-func (s *userService) Update(id uint, username, password, email string) error {
+func (s *UserService) Update(id uint, username, password, email string) error {
 	user, err := s.userRepository.FindByID(id)
 	if err != nil {
 		return err
@@ -218,11 +198,11 @@ func (s *userService) Update(id uint, username, password, email string) error {
 	return s.userRepository.Save(user)
 }
 
-func (s *userService) DeleteByID(id uint) error {
+func (s *UserService) DeleteByID(id uint) error {
 	return s.userRepository.DeleteByID(id)
 }
 
-func (s *userService) GetRolesOfUser(userid uint) ([]model.Role, error) {
+func (s *UserService) GetRolesOfUser(userid uint) ([]model.Role, error) {
 	user, err := s.userRepository.FindByID(userid)
 	if err != nil {
 		return nil, err
@@ -234,7 +214,7 @@ func (s *userService) GetRolesOfUser(userid uint) ([]model.Role, error) {
 	return roles, nil
 }
 
-func (s *userService) AddRoleToUser(userid, roleid uint) error {
+func (s *UserService) AddRoleToUser(userid, roleid uint) error {
 	user, err := s.userRepository.FindByID(userid)
 	if err != nil {
 		return err
@@ -246,7 +226,7 @@ func (s *userService) AddRoleToUser(userid, roleid uint) error {
 	return s.userRepository.AddRoleToUser(user, role)
 }
 
-func (s *userService) RemoveRoleFromUser(userid, roleid uint) error {
+func (s *UserService) RemoveRoleFromUser(userid, roleid uint) error {
 	user, err := s.userRepository.FindByID(userid)
 	if err != nil {
 		return err
