@@ -38,7 +38,6 @@ import (
 // @host			localhost:8080
 // @BasePath		/
 func main() {
-
 	log.Println("Starting fiber")
 	app := fiber.New(fiber.Config{
 		Prefork:       false, // this makes everything complicated and we don't need it behind a reverse proxy
@@ -101,7 +100,6 @@ func main() {
 		userRepository,
 		registrationKeyRepository,
 		roleRepository,
-		store,
 	)
 	registrationKeyService := service.NewRegistrationKeyService(
 		registrationKeyRepository,
@@ -113,6 +111,7 @@ func main() {
 
 	userController := controller.NewUserController(
 		userService,
+		store,
 	)
 	registrationKeyController := controller.NewRegistrationKeyController(
 		registrationKeyService,
@@ -139,7 +138,7 @@ func main() {
 	registrationKeyRepository.Migrate()
 	roleRepository.Migrate()
 
-	SetupTestDatabase(db)
+	setupTestDatabase(db, userService, roleService, registrationKeyService)
 
 	log.Println("	Setting up routes")
 	routa.Init()
@@ -152,36 +151,45 @@ func main() {
 	log.Fatal(app.Listen(":8080"))
 }
 
-func SetupTestDatabase(db *gorm.DB) {
+func setupTestDatabase(db *gorm.DB, userService service.UserService, roleService service.RoleService, registrationKeyService service.RegistrationKeyService) {
 	log.Println("	Setting up test database")
 	log.Println("		Deleting tables")
 
 	var users []model.User
 	db.Find(&users)
 	for _, user := range users {
-		db.Unscoped().Select(clause.Associations).Delete(user)
+		must(db.Unscoped().Select(clause.Associations).Delete(user).Error)
 	}
 	var roles []model.Role
 	db.Find(&roles)
 	for _, role := range roles {
-		db.Unscoped().Select(clause.Associations).Delete(role)
+		must(db.Unscoped().Select(clause.Associations).Delete(role).Error)
 	}
 	// db.Unscoped().Select(clause.Associations).Where("true").Delete(&model.Token{})
-	db.Unscoped().Select(clause.Associations).Where("true").Delete(&model.RegistrationKey{})
+	must(db.Unscoped().Select(clause.Associations).Where("true").Delete(&model.RegistrationKey{}).Error)
 
 	log.Println("		Resetting auto increment sequences")
-	db.Exec("ALTER SEQUENCE users_id_seq RESTART WITH 1")
-	db.Exec("ALTER SEQUENCE roles_id_seq RESTART WITH 1")
+	must(db.Exec("ALTER SEQUENCE users_id_seq RESTART WITH 1").Error)
+	must(db.Exec("ALTER SEQUENCE roles_id_seq RESTART WITH 1").Error)
 	// db.Exec("ALTER SEQUENCE tokens_id_seq RESTART WITH 1")
-	db.Exec("ALTER SEQUENCE registration_keys_id_seq RESTART WITH 1")
+	must(db.Exec("ALTER SEQUENCE registration_keys_id_seq RESTART WITH 1").Error)
 
 	log.Println("		Creating test data")
-	db.Create(&model.RegistrationKey{Key: "test_registration_key", ExpiresAt: time.Now().AddDate(0, 0, 3)})
-	db.Create(&model.User{Username: "Testuser", Password: "hashedPWplaceholder"})
-	db.Create(&model.Role{Name: "Testrole"})
-	db.Create(&model.Role{Name: "admin"})
-	db.Exec("INSERT INTO user_roles (user_id, role_id) values (1, 1)")
-	db.Exec("INSERT INTO user_roles (user_id, role_id) values (1, 2)")
+	must(registrationKeyService.Create("test_registration_key", "just for testing", true, time.Now().AddDate(0, 0, 3)))
+	must(userService.Create("User", "password1234", "user@example.com"))
+	must(userService.Create("Admin", "password1234", "admin@example.com"))
+	must(roleService.Create("admin"))
+	admin, err := userService.GetByName("Admin")
+	must(err)
+	adminRole, err := roleService.GetByName("admin")
+	must(err)
+	must(roleService.AddUserToRole(adminRole.ID, admin.ID))
+}
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
 }
 
 func printRoutes(routes map[string][]string) {

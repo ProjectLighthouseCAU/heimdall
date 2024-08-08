@@ -3,7 +3,6 @@ package service
 import (
 	"time"
 
-	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/session"
 	"lighthouse.uni-kiel.de/lighthouse-api/crypto"
 	"lighthouse.uni-kiel.de/lighthouse-api/model"
@@ -14,15 +13,13 @@ type UserService struct {
 	userRepository            repository.UserRepository
 	registrationKeyRepository repository.RegistrationKeyRepository
 	roleRepository            repository.RoleRepository
-	sessionStore              *session.Store
 }
 
-func NewUserService(ur repository.UserRepository, rkr repository.RegistrationKeyRepository, rr repository.RoleRepository, s *session.Store) UserService {
+func NewUserService(ur repository.UserRepository, rkr repository.RegistrationKeyRepository, rr repository.RoleRepository) UserService {
 	return UserService{
 		userRepository:            ur,
 		registrationKeyRepository: rkr,
 		roleRepository:            rr,
-		sessionStore:              s,
 	}
 }
 
@@ -38,11 +35,7 @@ func (s *UserService) GetByName(name string) (*model.User, error) {
 	return s.userRepository.FindByName(name)
 }
 
-func (s *UserService) Login(username, password string, c *fiber.Ctx) error {
-	session, err := s.sessionStore.Get(c)
-	if err != nil {
-		return model.InternalServerError{Message: "Could not create session", Err: err}
-	}
+func (s *UserService) Login(username, password string, session *session.Session) error {
 	_, ok := session.Get("userid").(uint)
 	if ok {
 		return nil // already logged in
@@ -93,12 +86,8 @@ func (s *UserService) Login(username, password string, c *fiber.Ctx) error {
 	return nil
 }
 
-func (s *UserService) Logout(c *fiber.Ctx) error {
-	session, err := s.sessionStore.Get(c)
-	if err != nil {
-		return model.InternalServerError{Message: "Could not get session", Err: err}
-	}
-	if err = session.Destroy(); err != nil {
+func (s *UserService) Logout(session *session.Session) error {
+	if err := session.Destroy(); err != nil {
 		return model.InternalServerError{Message: "Could not destroy session", Err: err}
 	}
 	return nil
@@ -125,7 +114,7 @@ func (s *UserService) checkIfUserExists(username string) error {
 	return nil
 }
 
-func (s *UserService) Register(username, password, email, registrationKey string) error {
+func (s *UserService) Register(username, password, email, registrationKey string, session *session.Session) error {
 	key, err := s.registrationKeyRepository.FindByKey(registrationKey)
 	if err != nil {
 		switch err.(type) {
@@ -157,6 +146,8 @@ func (s *UserService) Register(username, password, email, registrationKey string
 		LastLogin:         &now,
 		RegistrationKeyID: &key.ID,
 	}
+	session.Set("userid", user.ID)
+	session.Save()
 	return s.userRepository.Save(&user)
 }
 

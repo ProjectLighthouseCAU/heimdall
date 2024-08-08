@@ -2,16 +2,20 @@ package controller
 
 import (
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/session"
+	"lighthouse.uni-kiel.de/lighthouse-api/model"
 	"lighthouse.uni-kiel.de/lighthouse-api/service"
 )
 
 type UserController struct {
-	userService service.UserService
+	userService  service.UserService
+	sessionStore *session.Store
 }
 
-func NewUserController(s service.UserService) UserController {
+func NewUserController(s service.UserService, store *session.Store) UserController {
 	return UserController{
-		userService: s,
+		userService:  s,
+		sessionStore: store,
 	}
 }
 
@@ -73,7 +77,11 @@ func (uc *UserController) Login(c *fiber.Ctx) error {
 	if err := c.BodyParser(&payload); err != nil {
 		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
 	}
-	err := uc.userService.Login(payload.Username, payload.Password, c)
+	session, err := uc.sessionStore.Get(c)
+	if err != nil {
+		return unwrapAndSendError(c, model.InternalServerError{Message: "Could not get session", Err: err})
+	}
+	err = uc.userService.Login(payload.Username, payload.Password, session)
 	if err != nil {
 		return unwrapAndSendError(c, err)
 	}
@@ -81,7 +89,11 @@ func (uc *UserController) Login(c *fiber.Ctx) error {
 }
 
 func (uc *UserController) Logout(c *fiber.Ctx) error {
-	if err := uc.userService.Logout(c); err != nil {
+	session, err := uc.sessionStore.Get(c)
+	if err != nil {
+		return unwrapAndSendError(c, model.InternalServerError{Message: "Could not get session", Err: err})
+	}
+	if err := uc.userService.Logout(session); err != nil {
 		return unwrapAndSendError(c, err)
 	}
 	return c.SendStatus(fiber.StatusOK)
@@ -109,7 +121,11 @@ func (uc *UserController) Register(c *fiber.Ctx) error {
 	if err := c.BodyParser(&payload); err != nil {
 		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
 	}
-	err := uc.userService.Register(payload.Username, payload.Password, payload.Email, payload.Registration_Key)
+	session, err := uc.sessionStore.Get(c)
+	if err != nil {
+		return unwrapAndSendError(c, model.InternalServerError{Message: "Could not get session", Err: err})
+	}
+	err = uc.userService.Register(payload.Username, payload.Password, payload.Email, payload.Registration_Key, session)
 	if err != nil {
 		return unwrapAndSendError(c, err)
 	}
