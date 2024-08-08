@@ -42,10 +42,6 @@ func (r *registrationKeyService) GetByKey(key string) (*model.RegistrationKey, e
 	return r.registrationKeyRepository.FindByKey(key)
 }
 
-func (r *registrationKeyService) checkIfKeyExists(key string) error {
-	return nil
-}
-
 func (r *registrationKeyService) Create(key, description string, permanent bool, expiresAt time.Time) error {
 	if key == "" { // special case: let the server generate the key
 		key = crypto.NewRandomAlphaNumString(config.GetInt("REGISTRATION_KEY_LENGTH", 20))
@@ -53,8 +49,9 @@ func (r *registrationKeyService) Create(key, description string, permanent bool,
 	if !isValidRegistrationKey(key) {
 		return model.BadRequestError{Message: "Invalid registration key"}
 	}
-	if err := r.checkIfKeyExists(key); err != nil {
-		return err
+	_, err := r.registrationKeyRepository.FindByKey(key)
+	if err == nil {
+		return model.ConflictError{Message: "Registration key already exists"}
 	}
 	// no restrictions on description, expiresAt (can be in the past for deactivated key)
 	// and permanent (false by default)

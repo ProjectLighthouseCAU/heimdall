@@ -17,14 +17,13 @@ func Connect() *gorm.DB {
 		config.GetInt("DB_PORT", 5432),
 		config.GetString("DB_USER", "postgres"),
 		config.GetString("DB_PASS", "postgres"),
-		config.GetString("DB_NAME", "LighthouseAPI"))
+		config.GetString("DB_NAME", "lighthouse"))
 
 	db, err := gorm.Open(postgres.New(postgres.Config{
 		DSN: dsn,
 	}), &gorm.Config{
-		TranslateError:         true,
-		SkipDefaultTransaction: true,
-		PrepareStmt:            true,
+		TranslateError: true,
+		PrepareStmt:    true,
 	})
 
 	if err != nil {
@@ -37,5 +36,9 @@ func Connect() *gorm.DB {
 	sqlDB.SetMaxIdleConns(10)
 	sqlDB.SetMaxOpenConns(100)
 	sqlDB.SetConnMaxLifetime(time.Hour)
+	// createDatabaseCommand := fmt.Sprintf("CREATE DATABASE %s", config.GetString("DB_NAME", "lighthouse"))
+	// if err := db.Exec(createDatabaseCommand).Error; err != nil {
+	// 	log.Fatalln("Failed to create database")
+	// }
 	return db
 }
