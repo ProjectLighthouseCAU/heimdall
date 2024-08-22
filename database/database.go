@@ -1,17 +1,19 @@
 package database
 
 import (
+	"context"
 	"fmt"
-	"log"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"lighthouse.uni-kiel.de/lighthouse-api/config"
+	"lighthouse.uni-kiel.de/lighthouse-api/model"
 )
 
-// Connect opens a connection to the PostgreSQL database for GORM to use
-func Connect() *gorm.DB {
+// ConnectPostgres opens a connection to the PostgreSQL database for GORM to use
+func ConnectPostgres() (*gorm.DB, error) {
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 		config.GetString("DB_HOST", "localhost"),
 		config.GetInt("DB_PORT", 5432),
@@ -27,18 +29,28 @@ func Connect() *gorm.DB {
 	})
 
 	if err != nil {
-		log.Fatalln("Failed to connect to database")
+		return nil, model.InternalServerError{Message: "Could not connect to postgres database", Err: err}
 	}
 	sqlDB, err := db.DB()
 	if err != nil {
-		log.Fatalln("Failed to get underlying sql.DB")
+		return nil, model.InternalServerError{Message: "Failed to get underlying sql.DB", Err: err}
 	}
 	sqlDB.SetMaxIdleConns(10)
 	sqlDB.SetMaxOpenConns(100)
 	sqlDB.SetConnMaxLifetime(time.Hour)
-	// createDatabaseCommand := fmt.Sprintf("CREATE DATABASE %s", config.GetString("DB_NAME", "lighthouse"))
-	// if err := db.Exec(createDatabaseCommand).Error; err != nil {
-	// 	log.Fatalln("Failed to create database")
-	// }
-	return db
+
+	return db, nil
+}
+
+func ConnectRedis(dbNumber int) (*redis.Client, error) {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     config.GetString("REDIS_HOST", "127.0.0.1") + ":" + config.GetString("REDIS_PORT", "6379"),
+		Username: config.GetString("REDIS_USER", ""),
+		Password: config.GetString("REDIS_PASSWORD", ""),
+		DB:       dbNumber,
+	})
+	if err := rdb.Ping(context.TODO()).Err(); err != nil {
+		return nil, model.InternalServerError{Message: "Failed to connect to redis", Err: err}
+	}
+	return rdb, nil
 }

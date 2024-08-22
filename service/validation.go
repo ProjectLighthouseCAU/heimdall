@@ -1,7 +1,6 @@
 package service
 
 import (
-	"log"
 	"strings"
 
 	"github.com/asaskevich/govalidator"
@@ -13,16 +12,14 @@ func isValidName(str string) bool {
 }
 
 func isValidEmail(str string) bool {
-	return govalidator.IsEmail(str)
+	return str == "" || govalidator.IsEmail(str)
 }
 
 func isValidPassword(str string) bool {
 	if strings.TrimSpace(str) == "" {
-		log.Println("pw empty")
 		return false
 	}
 	if len(str) < config.GetInt("MIN_PASSWORD_LENGTH", 12) {
-		log.Println("pw too short")
 		return false
 	}
 	// TODO: more password criteria

@@ -38,6 +38,18 @@ func (r *RegistrationKeyRepository) FindByKey(key string) (*model.RegistrationKe
 	return &rkey, wrapError(err)
 }
 
+func (r *RegistrationKeyRepository) ExistsByID(id uint) (bool, error) {
+	var exists bool
+	err := r.DB.Model(model.RegistrationKey{}).Select("count(1) > 0").Where("id = ?", id).Find(&exists).Error
+	return exists, wrapError(err)
+}
+
+func (r *RegistrationKeyRepository) ExistsByKey(key string) (bool, error) {
+	var exists bool
+	err := r.DB.Model(model.RegistrationKey{}).Select("count(1) > 0").Where("key = ?", key).Find(&exists).Error
+	return exists, wrapError(err)
+}
+
 func (r *RegistrationKeyRepository) Delete(key *model.RegistrationKey) error {
 	return wrapError(r.DB.Unscoped().Delete(key).Error)
 }

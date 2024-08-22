@@ -1,7 +1,16 @@
 package router
 
 import (
+	"time"
+
+	swagger "github.com/arsmn/fiber-swagger/v2"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/monitor"
+	"github.com/gofiber/fiber/v2/middleware/pprof"
+	"github.com/gofiber/fiber/v2/middleware/recover"
 	"lighthouse.uni-kiel.de/lighthouse-api/config"
 	"lighthouse.uni-kiel.de/lighthouse-api/controller"
 	"lighthouse.uni-kiel.de/lighthouse-api/middleware"
@@ -12,24 +21,62 @@ type Router struct {
 	userController            controller.UserController
 	registrationKeyController controller.RegistrationKeyController
 	roleController            controller.RoleController
+	tokenController           controller.TokenController
 	sessionMiddleware         fiber.Handler
 }
 
-func NewRouter(app *fiber.App, uc controller.UserController, rkc controller.RegistrationKeyController, rc controller.RoleController, sessionMiddleware fiber.Handler) Router {
-	return Router{
-		app:                       app,
-		userController:            uc,
-		registrationKeyController: rkc,
-		roleController:            rc,
-		sessionMiddleware:         sessionMiddleware,
-	}
+func NewRouter(app *fiber.App,
+	userContr controller.UserController,
+	regKeyContr controller.RegistrationKeyController,
+	roleContr controller.RoleController,
+	tokenContr controller.TokenController,
+	sessionMiddleware fiber.Handler) Router {
+	return Router{app, userContr, regKeyContr, roleContr, tokenContr, sessionMiddleware}
 }
 
+// //go:embed Heimdall_OpenAPI.yaml
+// var f embed.FS
+
 func (r *Router) Init() {
+	// r.app.Use("/docs", filesystem.New(filesystem.Config{
+	// 	Root:   http.FS(f),
+	// 	Browse: true,
+	// }))
+	r.app.Use(logger.New())
+	r.app.Use(recover.New())
+	// app.Use(csrf.New()) // FIXME: csrf prevents everything except GET requests
+	r.app.Use(cors.New())
+	r.app.Use(limiter.New(limiter.Config{
+		Max:        300,
+		Expiration: 1 * time.Minute,
+	}))
+	r.app.Use(pprof.New())
+
+	swag := swagger.New(swagger.Config{
+		Title:                    "Heimdall Lighthouse API",
+		URL:                      "doc.json",
+		DeepLinking:              false,
+		DisplayOperationId:       false,
+		DefaultModelsExpandDepth: 1,
+		DefaultModelExpandDepth:  1,
+		DefaultModelRendering:    "example",
+		DisplayRequestDuration:   true,
+		Filter:                   swagger.FilterConfig{Enabled: true},
+		TryItOutEnabled:          true,
+		RequestSnippetsEnabled:   true,
+		SupportedSubmitMethods:   []string{"get", "put", "post", "delete", "options", "head", "patch", "trace"},
+		ValidatorUrl:             "",
+		WithCredentials:          false,
+	})
+	r.app.Get("/swagger", swag)
+	r.app.Get("/swagger/*", swag)
+
 	r.app.Post("/register", r.userController.Register)
 	r.app.Post("/login", r.userController.Login)
 
 	r.app.Use(r.sessionMiddleware)
+	r.app.Get("/metrics", monitor.New())
+
 	r.app.Post("/logout", r.userController.Logout)
 	r.initUserRoutes()
 	r.initRegistrationKeyRoutes()
@@ -44,12 +91,13 @@ unauthorized:
 admin: /**
 user:
 	/logout
-	(GET /users)
+	GET /users
 	GET /users/<own-id>
 	PUT /users/<own-id>
 	DELETE /users/<own-id>
 	GET /users/<own-id>/roles
 
+	Authorization not implemented yet (currently admin only):
 	(GET /roles/<own-roles-id>)
 	(GET /registration-keys/<own-reg-key-id>)
 */
@@ -64,8 +112,8 @@ func (r *Router) initUserRoutes() {
 	users.Put("/:id<int>", middleware.AllowRoleOrOwnUserId(admin, "id"), r.userController.Update)
 	users.Delete("/:id<int>", middleware.AllowRoleOrOwnUserId(admin, "id"), r.userController.Delete)
 	users.Get("/:id<int>/roles", middleware.AllowRoleOrOwnUserId(admin, "id"), r.userController.GetRolesOfUser)
-	users.Put("/:userid<int>/roles/:roleid<int>", middleware.AllowRole(admin), r.userController.AddRoleToUser)
-	users.Delete("/:userid<int>/roles/:roleid<int>", middleware.AllowRole(admin), r.userController.RemoveRoleFromUser)
+	users.Get("/:id/api-token", middleware.AllowRoleOrOwnUserId(admin, "id"), r.tokenController.Get)       // username, token, roles, expiration
+	users.Delete("/:id/api-token", middleware.AllowRoleOrOwnUserId(admin, "id"), r.tokenController.Delete) // invalidate and renew token
 }
 
 func (r *Router) initRegistrationKeyRoutes() {

@@ -22,7 +22,7 @@ func (r *UserRepository) Save(user *model.User) error {
 
 func (r *UserRepository) FindAll() ([]model.User, error) {
 	var users []model.User
-	err := r.DB.Find(&users).Error
+	err := r.DB.Find(&users).Order("id ASC").Error
 	return users, wrapError(err)
 }
 
@@ -38,6 +38,18 @@ func (r *UserRepository) FindByName(name string) (*model.User, error) {
 	return &user, wrapError(err)
 }
 
+func (r *UserRepository) ExistsByID(id uint) (bool, error) {
+	var exists bool
+	err := r.DB.Model(model.User{}).Select("count(1) > 0").Where("id = ?", id).Find(&exists).Error
+	return exists, wrapError(err)
+}
+
+func (r *UserRepository) ExistsByName(name string) (bool, error) {
+	var exists bool
+	err := r.DB.Model(model.User{}).Select("count(1) > 0").Where("username = ?", name).Find(&exists).Error
+	return exists, wrapError(err)
+}
+
 func (r *UserRepository) DeleteByID(id uint) error {
 	return wrapError(r.DB.Unscoped().Select(clause.Associations).Delete(&model.User{Model: model.Model{ID: id}}).Error)
 }
@@ -46,14 +58,6 @@ func (r *UserRepository) GetRolesOfUser(user *model.User) ([]model.Role, error) 
 	var roles []model.Role
 	err := r.DB.Model(user).Association("Roles").Find(&roles)
 	return roles, wrapError(err)
-}
-
-func (r *UserRepository) AddRoleToUser(user *model.User, role *model.Role) error {
-	return wrapError(r.DB.Model(user).Association("Roles").Append(role))
-}
-
-func (r *UserRepository) RemoveRoleFromUser(user *model.User, role *model.Role) error {
-	return wrapError(r.DB.Model(user).Association("Roles").Delete(role))
 }
 
 func (r *UserRepository) Migrate() error {

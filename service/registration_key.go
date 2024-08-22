@@ -13,10 +13,8 @@ type RegistrationKeyService struct {
 	registrationKeyRepository repository.RegistrationKeyRepository
 }
 
-func NewRegistrationKeyService(r repository.RegistrationKeyRepository) RegistrationKeyService {
-	return RegistrationKeyService{
-		registrationKeyRepository: r,
-	}
+func NewRegistrationKeyService(regKeyRepo repository.RegistrationKeyRepository) RegistrationKeyService {
+	return RegistrationKeyService{regKeyRepo}
 }
 
 func (r *RegistrationKeyService) GetAll() ([]model.RegistrationKey, error) {
@@ -33,13 +31,20 @@ func (r *RegistrationKeyService) GetByKey(key string) (*model.RegistrationKey, e
 
 func (r *RegistrationKeyService) Create(key, description string, permanent bool, expiresAt time.Time) error {
 	if key == "" { // special case: let the server generate the key
-		key = crypto.NewRandomAlphaNumString(config.GetInt("REGISTRATION_KEY_LENGTH", 20))
+		var err error
+		key, err = crypto.NewRandomAlphaNumString(config.GetInt("REGISTRATION_KEY_LENGTH", 20))
+		if err != nil {
+			return model.InternalServerError{Message: "Could not generate new registration key", Err: err}
+		}
 	}
 	if !isValidRegistrationKey(key) {
 		return model.BadRequestError{Message: "Invalid registration key"}
 	}
-	_, err := r.registrationKeyRepository.FindByKey(key)
-	if err == nil {
+	exists, err := r.registrationKeyRepository.ExistsByKey(key)
+	if err != nil {
+		return model.InternalServerError{Err: err}
+	}
+	if exists {
 		return model.ConflictError{Message: "Registration key already exists"}
 	}
 	// no restrictions on description, expiresAt (can be in the past for deactivated key)

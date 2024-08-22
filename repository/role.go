@@ -22,7 +22,7 @@ func (r *RoleRepository) Save(role *model.Role) error {
 
 func (r *RoleRepository) FindAll() ([]model.Role, error) {
 	var roles []model.Role
-	err := r.DB.Find(&roles).Error
+	err := r.DB.Find(&roles).Order("id ASC").Error
 	return roles, wrapError(err)
 }
 
@@ -42,6 +42,18 @@ func (r *RoleRepository) FindByNames(names []string) ([]model.Role, error) {
 	var roles []model.Role
 	err := r.DB.Preload(clause.Associations).Where("name IN ?", names).Find(&roles).Error
 	return roles, wrapError(err)
+}
+
+func (r *RoleRepository) ExistsByID(id uint) (bool, error) {
+	var exists bool
+	err := r.DB.Model(model.Role{}).Select("count(1) > 0").Where("id = ?", id).Find(&exists).Error
+	return exists, wrapError(err)
+}
+
+func (r *RoleRepository) ExistsByName(name string) (bool, error) {
+	var exists bool
+	err := r.DB.Model(model.Role{}).Select("count(1) > 0").Where("name = ?", name).Find(&exists).Error
+	return exists, wrapError(err)
 }
 
 func (r *RoleRepository) Delete(role *model.Role) error {

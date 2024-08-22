@@ -8,7 +8,7 @@ import (
 	"lighthouse.uni-kiel.de/lighthouse-api/config"
 )
 
-var optimalCost = calculateOptimalCost()
+var optimalCost = config.GetInt("BCRYPT_COST_FACTOR", calculateOptimalCost())
 
 func HashPassword(password string) ([]byte, error) {
 	return bcrypt.GenerateFromPassword([]byte(password), optimalCost)

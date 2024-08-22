@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"runtime"
@@ -8,68 +9,57 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/limiter"
-	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/monitor"
-	"github.com/gofiber/fiber/v2/middleware/pprof"
-	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/session"
 	"github.com/gofiber/fiber/v2/utils"
-	"github.com/gofiber/storage/redis"
+	fiberRedis "github.com/gofiber/storage/redis"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"lighthouse.uni-kiel.de/lighthouse-api/config"
 	"lighthouse.uni-kiel.de/lighthouse-api/controller"
 	"lighthouse.uni-kiel.de/lighthouse-api/database"
+	_ "lighthouse.uni-kiel.de/lighthouse-api/docs"
 	"lighthouse.uni-kiel.de/lighthouse-api/middleware"
 	"lighthouse.uni-kiel.de/lighthouse-api/model"
 	"lighthouse.uni-kiel.de/lighthouse-api/repository"
 	"lighthouse.uni-kiel.de/lighthouse-api/router"
 	"lighthouse.uni-kiel.de/lighthouse-api/service"
-
-	swagger "github.com/arsmn/fiber-swagger/v2"
-	_ "lighthouse.uni-kiel.de/lighthouse-api/docs"
 )
 
-// @title			Lighthouse API
-// @version		1.0
-// @description	This is the REST API of Project Lighthouse
-// @host			localhost:8080
-// @BasePath		/
+// @Title		Heimdall Lighthouse API
+// @Version		0.1
+// @Description	This is the REST API of Project Lighthouse that manages users, roles, registration keys, API tokens and everything about authentication and authorization.
+// @Description NOTE: This API is an early alpha version that still needs a lot of testing (unit tests, end-to-end tests and security tests)
+// @Host		https://lighthouse.uni-kiel.de
+// @BasePath	/api/
 func main() {
-	log.Println("Starting fiber")
+	log.Println("Starting Heimdall")
 	app := fiber.New(fiber.Config{
-		Prefork:       false, // this makes everything complicated and we don't need it behind a reverse proxy
+		AppName:       "Heimdall",
 		CaseSensitive: true,
 		StrictRouting: true,
-		ServerHeader:  "Fiber",
-		AppName:       "Lighthouse API",
 	})
-	log.Println("	Setting up middleware")
-	app.Use(logger.New())
-	app.Use(recover.New())
-	// app.Use(csrf.New()) // FIXME: csrf prevents everything except GET requests
-	app.Use(cors.New())
-	app.Use(limiter.New(limiter.Config{
-		Max:        300,
-		Expiration: 1 * time.Minute,
-	}))
-	// TODO: secure monitoring routes
-	app.Use(pprof.New())
-	app.Get("/metrics", monitor.New())
 
-	// dependency injection
+	// Dependency Injection
+
+	// databases
 	log.Println("	Connecting to database")
-	db := database.Connect()
+	db, err := database.ConnectPostgres()
+	if err != nil {
+		log.Println(err)
+	}
+	redisdb, err := database.ConnectRedis(0) // use db 0 for api tokens and roles
+	if err != nil {
+		log.Println(err)
+	}
 	log.Println("	Connected to database")
 
-	storage := redis.New(redis.Config{
+	storage := fiberRedis.New(fiberRedis.Config{
 		Host:      config.GetString("REDIS_HOST", "127.0.0.1"),
 		Port:      config.GetInt("REDIS_PORT", 6379),
 		Username:  config.GetString("REDIS_USER", ""),
 		Password:  config.GetString("REDIS_PASSWORD", ""),
-		Database:  0,
+		Database:  1, // use db 1 for sessions
 		Reset:     false,
 		TLSConfig: nil,
 		PoolSize:  10 * runtime.GOMAXPROCS(0),
@@ -82,24 +72,18 @@ func main() {
 		KeyGenerator: utils.UUIDv4,
 	})
 
+	// repositories
 	userRepository := repository.NewUserRepository(db)
 	registrationKeyRepository := repository.NewRegistrationKeyRepository(db)
 	roleRepository := repository.NewRoleRepository(db)
 
-	// roleManager := service.NewRoleManager(
-	// 	roleRepository,
-	// 	userRepository,
-	// )
-	// accessControlService := service.NewAccessControlService(
-	// 	db,
-	// 	userRepository,
-	// 	roleRepository,
-	// 	roleManager,
-	// )
+	// services
+	tokenService := service.NewTokenService(redisdb)
 	userService := service.NewUserService(
 		userRepository,
 		registrationKeyRepository,
 		roleRepository,
+		tokenService,
 	)
 	registrationKeyService := service.NewRegistrationKeyService(
 		registrationKeyRepository,
@@ -107,10 +91,13 @@ func main() {
 	roleService := service.NewRoleService(
 		roleRepository,
 		userRepository,
+		tokenService,
 	)
 
+	// controllers
 	userController := controller.NewUserController(
 		userService,
+		roleService,
 		store,
 	)
 	registrationKeyController := controller.NewRegistrationKeyController(
@@ -119,40 +106,44 @@ func main() {
 	roleController := controller.NewRoleController(
 		roleService,
 	)
+	tokenController := controller.NewTokenController(
+		tokenService,
+		userService,
+	)
 
-	// casbinMiddleware := middleware.NewCasbinMiddleware(
-	// 	accessControlService,
-	// )
-	sessionMiddleware := middleware.NewSessionMiddleware(store, userService)
+	// middleware
+	sessionMiddleware := middleware.NewSessionMiddleware(store, userService, tokenService)
 
+	// router
 	routa := router.NewRouter(
 		app,
 		userController,
 		registrationKeyController,
 		roleController,
-		// casbinMiddleware,
+		tokenController,
 		sessionMiddleware,
 	)
 
+	// migrate database
 	userRepository.Migrate()
 	registrationKeyRepository.Migrate()
 	roleRepository.Migrate()
 
-	setupTestDatabase(db, userService, roleService, registrationKeyService)
+	// TODO: remove in prod
+	setupTestDatabase(db, redisdb, store, userService, roleService, registrationKeyService)
 
-	log.Println("	Setting up routes")
 	routa.Init()
 	printRoutes(routa.ListRoutes())
 
-	// TODO: fix and finish swagger documentation
-	app.Get("/swagger", swagger.HandlerDefault)
-	app.Get("/swagger/*", swagger.HandlerDefault)
 	log.Println("Setup done. Listening...")
 	log.Fatal(app.Listen(":8080"))
 }
 
-func setupTestDatabase(db *gorm.DB, userService service.UserService, roleService service.RoleService, registrationKeyService service.RegistrationKeyService) {
+func setupTestDatabase(db *gorm.DB, rdb *redis.Client, store *session.Store, userService service.UserService, roleService service.RoleService, registrationKeyService service.RegistrationKeyService) {
 	log.Println("	Setting up test database")
+	log.Println("		Deleting redis")
+	must(store.Storage.Reset())
+	must(rdb.FlushDB(context.TODO()).Err())
 	log.Println("		Deleting tables")
 
 	var users []model.User
@@ -176,8 +167,8 @@ func setupTestDatabase(db *gorm.DB, userService service.UserService, roleService
 
 	log.Println("		Creating test data")
 	must(registrationKeyService.Create("test_registration_key", "just for testing", true, time.Now().AddDate(0, 0, 3)))
-	must(userService.Create("User", "password1234", "user@example.com"))
-	must(userService.Create("Admin", "password1234", "admin@example.com"))
+	must(userService.Create("User", "password1234", "user@example.com", false))
+	must(userService.Create("Admin", "password1234", "admin@example.com", false))
 	must(roleService.Create("admin"))
 	admin, err := userService.GetByName("Admin")
 	must(err)
