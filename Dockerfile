@@ -25,14 +25,14 @@ RUN go get -d ./...
 # copy the code into the build image
 COPY . .
 
-# set permissions for the app user
-RUN chown -R app /app
-RUN chmod -R +rwx /app
-
 # build the application
 ARG CGO_ENABLED=0
 ARG TARGETOS TARGETARCH
-RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -a -installsuffix cgo -o auth-api .
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -a -installsuffix cgo -o heimdall .
+
+# set permissions for the app user
+RUN chown -R app /app
+RUN chmod -R +rx /app/heimdall
 
 ### RUNTIME IMAGE ###
 
