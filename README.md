@@ -10,10 +10,8 @@ Router <-> Controller <-> Service <-> Repository <-> Model/Database
 
 ## Documentation
 
-An automatically generated and served documentation using "Swagger" is available under the `/swagger` endpoint.
-
-There also is a postman collection under the following link (if the link has expired, you can import the OpenAPI JSON/YAML from `/swagger/doc.json` into postman)
-`https://api.postman.com/collections/8583311-cc31c376-2940-4cdf-17cd-efb5b7c2a63c?access_key=PMAT-01H91EB1MV6FFTSXE51HX934WV`  
+The documentation gets automatically generated from code comments and is served by the application using "Swagger" (see https://swagger.io/). It is available under the `/swagger` endpoint.
+Swagger also provides the documentation in the OpenAPI standard, so you can get the OpenAPI JSON specification from `/swagger/doc.json` and import it into the program of your choice that supports OpenAPI (e.g. Postman).
 
 ## TODO
 - important: API documentation (swagger)
@@ -30,3 +28,4 @@ There also is a postman collection under the following link (if the link has exp
 - maybe: allow user to query their own registration key and role (not important since available through the /users route)
 - ...
 - better README ;-)
+
