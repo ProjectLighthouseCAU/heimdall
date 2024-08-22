@@ -4,21 +4,28 @@
 
 This service handles authentication and authorization/access control for users providing a REST API as its interface. The name might be inspired by a legacy codebase.
 
-## Roadmap:
-
-- authentication tokens for users (decide on JWT or normal sessions)
-- finish casbin middleware
-- test the custom RoleManager
-- test access control
-- ...
-- better README ;-)
-
 ## Architecture
 
 Router <-> Controller <-> Service <-> Repository <-> Model/Database
 
 ## Documentation
 
-Currently there is only a Postman collection that you can import with the following link:  
-`https://api.postman.com/collections/8583311-cc31c376-2940-4cdf-17cd-efb5b7c2a63c?access_key=PMAT-01J3G5MC4DX6ZVW4V5FVP9MARW`  
-An automatically generated and served documentation using "Swagger" is also available under `/swagger` but currently not complete.
+The documentation gets automatically generated from code comments and is served by the application using "Swagger" (see https://swagger.io/). It is available under the `/swagger` endpoint.
+Swagger also provides the documentation in the OpenAPI standard, so you can get the OpenAPI JSON specification from `/swagger/doc.json` and import it into the program of your choice that supports OpenAPI (e.g. Postman).
+
+## TODO
+- important: API documentation (swagger)
+- important: testing (end-to-end, unit, security)
+- important: security (csrf, xss, sqli, cors, same-origin, csp)
+- important: don't return database errors, they could leak sensitive information
+- important: password criteria (sync with frontend)
+- important: don't return plain text (bad practice), always return json e.g. {"code": 404, "message": "Not found}
+- important: use transactions for redis and maybe postgres
+- maybe: remove redundant timestamp from user table (LastLogin and UpdatedAt are nearly identical, but UpdatedAt only changes because LastLogin is updated :D) -> however when an admin updates a user that hasn't logged in for a while, the field makes sense
+- find out why gorm does not load associations (joins)
+- maybe: rename every occurrence of controller to handler
+- maybe: overhaul registration key prefix and generation
+- maybe: allow user to query their own registration key and role (not important since available through the /users route)
+- ...
+- better README ;-)
+

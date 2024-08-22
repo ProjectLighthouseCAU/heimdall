@@ -1,222 +1,292 @@
 package controller
 
 import (
+	"fmt"
+
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/session"
+	"lighthouse.uni-kiel.de/lighthouse-api/model"
 	"lighthouse.uni-kiel.de/lighthouse-api/service"
 )
 
-type UserController interface {
-	Get(c *fiber.Ctx) error
-	GetByID(c *fiber.Ctx) error
-	Create(c *fiber.Ctx) error
-	Login(c *fiber.Ctx) error
-	Register(c *fiber.Ctx) error
-	Update(c *fiber.Ctx) error
-	Delete(c *fiber.Ctx) error
-	GetRolesOfUser(c *fiber.Ctx) error
-	AddRoleToUser(c *fiber.Ctx) error
-	RemoveRoleFromUser(c *fiber.Ctx) error
+type UserController struct {
+	userService  service.UserService
+	roleService  service.RoleService
+	sessionStore *session.Store
 }
 
-type userController struct {
-	userService service.UserService
+func NewUserController(userService service.UserService,
+	roleService service.RoleService,
+	sessionStore *session.Store) UserController {
+	return UserController{userService, roleService, sessionStore}
 }
 
-var _ UserController = (*userController)(nil) // compile-time interface check
-
-func NewUserController(s service.UserService) *userController {
-	return &userController{
-		userService: s,
-	}
-}
-
-//	@description	Returns a list of all users
-//	@produce		json
-//	@success		200	{array}	model.User
-//	@router			/users [get]
-func (uc *userController) Get(c *fiber.Ctx) error {
+// @Summary      Get all users or query by name
+// @Description  Get a list of all users or query a single user by name (returns single object instead of list). NOTE: registration_key is only included when querying a single user
+// @Tags         Users
+// @Produce      json
+// @Param        name  query  string  false  "Username"
+// @Success      200  {object}  []model.User
+// @Failure      401  "Unauthorized"
+// @Failure      403  "Forbidden"
+// @Failure      404  "Not Found"
+// @Failure      500  "Internal Server Error"
+// @Router       /users [get]
+func (uc *UserController) GetAll(c *fiber.Ctx) error {
 	// query users by name
 	name := c.Query("name", "")
 	if name != "" {
-		user, err := uc.userService.GetByName(name)
-		if err != nil {
-			return unwrapAndSendError(c, err)
-		}
-		return c.JSON(user)
+		return c.Next()
 	}
 
 	// return all users
 	users, err := uc.userService.GetAll()
 	if err != nil {
-		return unwrapAndSendError(c, err)
+		return UnwrapAndSendError(c, err)
 	}
 	return c.JSON(users)
-
 }
 
-//	@description	Returns a user by id
-//	@produce		json
-//	@success		200	{object}	model.User
-//	@failure		400	{object}	string	"Bad Request"
-//	@failure		404	{object}	string	"Not Found"
-//	@router			/user/{id} [get]
-func (uc *userController) GetByID(c *fiber.Ctx) error {
+// Documentation included in GetAll
+func (uc *UserController) GetByName(c *fiber.Ctx) error {
+	name := c.Query("name", "")
+	if name == "" {
+		return fiber.ErrBadRequest
+	}
+	user, err := uc.userService.GetByName(name)
+	if err != nil {
+		return UnwrapAndSendError(c, err)
+	}
+	return c.JSON(user)
+}
+
+// @Summary      Get user by id
+// @Description  Get a user by its user id
+// @Id 			 GetUserByName
+// @Tags         Users
+// @Produce      json
+// @Param        id  path  int  true  "User ID"
+// @Success      200  {object}  model.User
+// @Failure      400  "Bad Request"
+// @Failure      401  "Unauthorized"
+// @Failure      403  "Forbidden"
+// @Failure      404  "Not Found"
+// @Failure      500  "Internal Server Error"
+// @Router       /users/{id} [get]
+func (uc *UserController) GetByID(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
 	user, err := uc.userService.GetByID(uint(id))
 	if err != nil {
-		return unwrapAndSendError(c, err)
+		return UnwrapAndSendError(c, err)
 	}
+	fmt.Printf("%+v", user)
 	return c.JSON(user)
 }
 
-func (uc *userController) Login(c *fiber.Ctx) error {
-	c.Accepts("json", "application/json", "application/x-www-form-urlencoded")
-	payload := struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}{}
+type LoginPayload struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+} //@name LoginPayload
+
+// @Summary      Login
+// @Description  Log in with username and password (sets a cookie with the session id)
+// @Tags         Users
+// @Accept       json
+// @Produce      plain
+// @Param        payload  body  LoginPayload  true  "Username and Password"
+// @Success      200  "OK"
+// @Failure      400  "Bad Request"
+// @Failure      401  "Unauthorized"
+// @Failure      500  "Internal Server Error"
+// @Router       /login [post]
+func (uc *UserController) Login(c *fiber.Ctx) error {
+	c.Accepts("application/json")
+	var payload LoginPayload
 	if err := c.BodyParser(&payload); err != nil {
 		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
 	}
-	token, err := uc.userService.Login(payload.Username, payload.Password)
+	session, err := uc.sessionStore.Get(c)
 	if err != nil {
-		return unwrapAndSendError(c, err)
+		return UnwrapAndSendError(c, model.InternalServerError{Message: "Could not get session", Err: err})
 	}
-	return c.JSON(token)
-}
-
-//	@description	Creates a user with a registration key (no extra auth needed)
-//	@id				RegisterUser
-//	@accept			json
-//	@produce		plain
-//	@success		201	{object}	string	"Created"
-//	@failure		400	{object}	string	"Bad Request"
-//	@failure		403	{object}	string	"Forbidden"
-//	@failure		500	{object}	string	"Internal Server Error"
-//	@failure		409	{object}	string	"Conflict"
-//	@router			/register [post]
-func (uc *userController) Register(c *fiber.Ctx) error {
-	c.Accepts("json", "application/json", "application/x-www-form-urlencoded")
-
-	payload := struct {
-		Username         string `json:"username"`
-		Password         string `json:"password"`
-		Email            string `json:"email"`
-		Registration_Key string `json:"registration_key"` // snake case naming for decoding of x-www-form-urlencoded bodies
-	}{}
-	if err := c.BodyParser(&payload); err != nil {
-		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
-	}
-	err := uc.userService.Register(payload.Username, payload.Password, payload.Email, payload.Registration_Key)
+	err = uc.userService.Login(payload.Username, payload.Password, session)
 	if err != nil {
-		return unwrapAndSendError(c, err)
-	}
-	return c.SendStatus(fiber.StatusCreated)
-}
-
-//	@description	Creates a user without a registration key (permissions needed)
-//	@accept			json
-//	@produce		plain
-//	@success		201	{object}	string	"Created"
-//	@failure		400	{object}	string	"Bad Request"
-//	@failure		500	{object}	string	"Internal Server Error"
-//	@failure		409	{object}	string	"Conflict"
-//	@router			/user [post]
-func (uc *userController) Create(c *fiber.Ctx) error {
-	c.Accepts("json", "application/json", "application/x-www-form-urlencoded")
-	payload := struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Email    string `json:"email"`
-	}{}
-	if err := c.BodyParser(&payload); err != nil {
-		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
-	}
-
-	err := uc.userService.Create(payload.Username, payload.Password, payload.Email)
-	if err != nil {
-		return unwrapAndSendError(c, err)
-	}
-	return c.SendStatus(fiber.StatusCreated)
-}
-
-func (uc *userController) Update(c *fiber.Ctx) error {
-	c.Accepts("json", "application/json", "application/x-www-form-urlencoded")
-	id, _ := c.ParamsInt("id", -1)
-	if id < 0 {
-		return c.SendStatus(fiber.StatusBadRequest)
-	}
-	payload := struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Email    string `json:"email"`
-	}{}
-	if err := c.BodyParser(&payload); err != nil {
-		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
-	}
-
-	err := uc.userService.Update(uint(id), payload.Username, payload.Password, payload.Email)
-	if err != nil {
-		return unwrapAndSendError(c, err)
+		return UnwrapAndSendError(c, err)
 	}
 	return c.SendStatus(fiber.StatusOK)
 }
 
-//	@description	Creates a user with a registration key (no extra auth needed)
-//	@id				RegisterUser
-//	@produce		plain
-//	@success		200	{object}	string	"OK"
-//	@failure		404	{object}	string	"Not Found"
-//	@router			/user/{id} [delete]
-func (uc *userController) Delete(c *fiber.Ctx) error {
+// @Summary      Logout
+// @Description  Log out of the current session
+// @Tags         Users
+// @Accept       json
+// @Produce      plain
+// @Success      200  "OK"
+// @Failure      401  "Unauthorized"
+// @Failure      500  "Internal Server Error"
+// @Router       /logout [post]
+func (uc *UserController) Logout(c *fiber.Ctx) error {
+	c.Accepts("application/json")
+	session, err := uc.sessionStore.Get(c)
+	if err != nil {
+		return UnwrapAndSendError(c, model.InternalServerError{Message: "Could not get session", Err: err})
+	}
+	if err := uc.userService.Logout(session); err != nil {
+		return UnwrapAndSendError(c, err)
+	}
+	return c.SendStatus(fiber.StatusOK)
+}
+
+type RegisterPayload struct {
+	Username        string `json:"username"`
+	Password        string `json:"password"`
+	Email           string `json:"email"`
+	RegistrationKey string `json:"registration_key"` // snake case naming for decoding of x-www-form-urlencoded bodies
+} //@name RegisterPayload
+
+// @Summary      Register user
+// @Description  Registers a new user using a registration key
+// @Tags         Users
+// @Accept       json
+// @Produce      plain
+// @Param        payload  body  RegisterPayload  true  "Username, Password, Email, RegistrationKey"
+// @Success      201  "Created"
+// @Failure      400  "Bad Request"
+// @Failure      401  "Unauthorized"
+// @Failure      409  "Conflict"
+// @Failure      500  "Internal Server Error"
+// @Router       /register [post]
+func (uc *UserController) Register(c *fiber.Ctx) error {
+	c.Accepts("application/json")
+	var payload RegisterPayload
+	if err := c.BodyParser(&payload); err != nil {
+		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
+	}
+	session, err := uc.sessionStore.Get(c)
+	if err != nil {
+		return UnwrapAndSendError(c, model.InternalServerError{Message: "Could not get session", Err: err})
+	}
+	err = uc.userService.Register(payload.Username, payload.Password, payload.Email, payload.RegistrationKey, session)
+	if err != nil {
+		return UnwrapAndSendError(c, err)
+	}
+	return c.SendStatus(fiber.StatusCreated)
+}
+
+type CreateOrUpdateUserPayload struct {
+	Username          string `json:"username"`
+	Password          string `json:"password"`
+	Email             string `json:"email"`
+	PermamentAPIToken bool   `json:"permanent_api_token"`
+} //@name CreateOrUpdateUserPayload
+
+// @Summary      Create user
+// @Description  Creates a new user
+// @Tags         Users
+// @Accept       json
+// @Produce      plain
+// @Param        payload  body  CreateOrUpdateUserPayload  true  "Username, Password, Email, PermanentAPIToken"
+// @Success      201  "Created"
+// @Failure      400  "Bad Request"
+// @Failure      401  "Unauthorized"
+// @Failure      403  "Forbidden"
+// @Failure      409  "Conflict"
+// @Failure      500  "Internal Server Error"
+// @Router       /users [post]
+func (uc *UserController) Create(c *fiber.Ctx) error {
+	c.Accepts("application/json")
+	var payload CreateOrUpdateUserPayload
+	if err := c.BodyParser(&payload); err != nil {
+		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
+	}
+
+	err := uc.userService.Create(payload.Username, payload.Password, payload.Email, payload.PermamentAPIToken)
+	if err != nil {
+		return UnwrapAndSendError(c, err)
+	}
+	return c.SendStatus(fiber.StatusCreated)
+}
+
+// @Summary      Update user
+// @Description  Updates a user (always updates all fields, partial updates currently not supported)
+// @Tags         Users
+// @Accept       json
+// @Produce      plain
+// @Param        id  path  int  true  "User ID"
+// @Param        payload  body  CreateOrUpdateUserPayload  true  "Username, Password, Email, PermanentAPIToken"
+// @Success      200  "OK"
+// @Failure      400  "Bad Request"
+// @Failure      401  "Unauthorized"
+// @Failure      403  "Forbidden"
+// @Failure      404  "Not Found"
+// @Failure      409  "Conflict"
+// @Failure      500  "Internal Server Error"
+// @Router       /users/{id} [put]
+func (uc *UserController) Update(c *fiber.Ctx) error {
+	c.Accepts("application/json")
+	id, _ := c.ParamsInt("id", -1)
+	if id < 0 {
+		return c.SendStatus(fiber.StatusBadRequest)
+	}
+	var payload CreateOrUpdateUserPayload
+	if err := c.BodyParser(&payload); err != nil {
+		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
+	}
+
+	err := uc.userService.Update(uint(id), payload.Username, payload.Password, payload.Email, payload.PermamentAPIToken)
+	if err != nil {
+		return UnwrapAndSendError(c, err)
+	}
+	return c.SendStatus(fiber.StatusOK)
+}
+
+// @Summary      Delete user
+// @Description  Deletes a user given a user id
+// @Tags         Users
+// @Produce      plain
+// @Param        id  path  int  true  "User ID"
+// @Success      200  "OK"
+// @Failure      400  "Bad Request"
+// @Failure      401  "Unauthorized"
+// @Failure      403  "Forbidden"
+// @Failure      404  "Not Found"
+// @Failure      500  "Internal Server Error"
+// @Router       /users/{id} [delete]
+func (uc *UserController) Delete(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
 	err := uc.userService.DeleteByID(uint(id))
 	if err != nil {
-		return unwrapAndSendError(c, err)
+		return UnwrapAndSendError(c, err)
 	}
 	return c.SendStatus(fiber.StatusOK)
 }
 
-func (uc *userController) GetRolesOfUser(c *fiber.Ctx) error {
+// @Summary      Get roles of user
+// @Description  Get a list of roles that a user posesses
+// @Tags         Users
+// @Produce      json
+// @Param        id  path  int  true  "User ID"
+// @Success      200  {object}  []model.Role
+// @Failure      400  "Bad Request"
+// @Failure      401  "Unauthorized"
+// @Failure      403  "Forbidden"
+// @Failure      404  "Not Found"
+// @Failure      500  "Internal Server Error"
+// @Router       /users/{id}/roles [get]
+func (uc *UserController) GetRolesOfUser(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
 	roles, err := uc.userService.GetRolesOfUser(uint(id))
 	if err != nil {
-		return unwrapAndSendError(c, err)
+		return UnwrapAndSendError(c, err)
 	}
 	return c.JSON(roles)
-}
-
-func (uc *userController) AddRoleToUser(c *fiber.Ctx) error {
-	userid, _ := c.ParamsInt("userid", -1)
-	roleid, _ := c.ParamsInt("roleid", -1)
-	if userid < 0 || roleid < 0 {
-		return c.SendStatus(fiber.StatusBadRequest)
-	}
-	err := uc.userService.AddRoleToUser(uint(userid), uint(roleid))
-	if err != nil {
-		return unwrapAndSendError(c, err)
-	}
-	return c.SendStatus(fiber.StatusOK)
-}
-
-func (uc *userController) RemoveRoleFromUser(c *fiber.Ctx) error {
-	userid, _ := c.ParamsInt("userid", -1)
-	roleid, _ := c.ParamsInt("roleid", -1)
-	if userid < 0 || roleid < 0 {
-		return c.SendStatus(fiber.StatusBadRequest)
-	}
-	err := uc.userService.RemoveRoleFromUser(uint(userid), uint(roleid))
-	if err != nil {
-		return unwrapAndSendError(c, err)
-	}
-	return c.SendStatus(fiber.StatusOK)
 }

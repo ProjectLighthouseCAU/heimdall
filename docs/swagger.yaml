@@ -1,140 +1,245 @@
-basePath: /
+basePath: /api/
 definitions:
-  model.RegistrationKey:
+  APIToken:
+    description: API token that allows access to the websocket API (beacon) and probably
+      other APIs in the future
     properties:
-      created_at:
+      api_token:
+        description: the actual API token
         type: string
+      expires_at:
+        description: expiration date of this token
+        type: string
+      roles:
+        description: roles associated with this token
+        items:
+          type: string
+        type: array
+      username:
+        description: unique username associated with this token
+        type: string
+    type: object
+  CreateOrUpdateRolePayload:
+    properties:
+      name:
+        type: string
+    type: object
+  CreateOrUpdateUserPayload:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+      permanent_api_token:
+        type: boolean
+      username:
+        type: string
+    type: object
+  CreateRegistrationKeyPayload:
+    properties:
       description:
         type: string
       expires_at:
         type: string
-      id:
-        type: integer
       key:
         type: string
       permanent:
         type: boolean
-      updated_at:
-        type: string
-      users:
-        items:
-          $ref: '#/definitions/model.User'
-        type: array
     type: object
-  model.User:
+  LoginPayload:
     properties:
-      created_at:
-        type: string
-      email:
-        type: string
-      id:
-        type: integer
-      last_login:
-        type: string
-      registration_key:
-        $ref: '#/definitions/model.RegistrationKey'
-      registration_key_id:
-        type: integer
-      updated_at:
+      password:
         type: string
       username:
         type: string
     type: object
-host: localhost:8080
+  RegisterPayload:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+      registration_key:
+        description: snake case naming for decoding of x-www-form-urlencoded bodies
+        type: string
+      username:
+        type: string
+    type: object
+  RegistrationKey:
+    description: A registration key that can be permanent or expire at a specified
+      date and time with which new users can register an account
+    properties:
+      created_at:
+        description: ISO 8601 datetime
+        type: string
+      description:
+        description: a description for this registration key
+        type: string
+      expires_at:
+        description: expiration date in ISO 8601 datetime
+        type: string
+      id:
+        description: id (primary key)
+        type: integer
+      key:
+        description: unique registration key
+        type: string
+      permanent:
+        description: if set, ignores the expires_at field and never expires this key
+        type: boolean
+      updated_at:
+        description: ISO 8601 datetime
+        type: string
+    type: object
+  Role:
+    description: A named role that describes a group of users sharing the same permissions
+    properties:
+      created_at:
+        description: ISO 8601 datetime
+        type: string
+      id:
+        description: id (primary key)
+        type: integer
+      name:
+        description: unique name of the role
+        type: string
+      updated_at:
+        description: ISO 8601 datetime
+        type: string
+    type: object
+  UpdateRegistrationKeyPayload:
+    properties:
+      description:
+        type: string
+      expires_at:
+        type: string
+      permanent:
+        type: boolean
+    type: object
+  User:
+    description: User account information including username, email, last login date
+      and time, permanent API token flag, registration key (if user registered with
+      a key) and roles
+    properties:
+      created_at:
+        description: ISO 8601 datetime
+        type: string
+      email:
+        description: can be empty
+        type: string
+      id:
+        description: id (primary key)
+        type: integer
+      last_login:
+        description: 'ISO 8601 datetime TODO: redundant with UpdatedAt but only because
+          LastLogin is updated on login'
+        type: string
+      permanent_api_token:
+        description: if set the users API token never automatically expires
+        type: boolean
+      registration_key:
+        allOf:
+        - $ref: '#/definitions/RegistrationKey'
+        description: omitted if null (when user was created and not registered)
+      updated_at:
+        description: ISO 8601 datetime
+        type: string
+      username:
+        description: must be unique
+        type: string
+    type: object
+host: https://lighthouse.uni-kiel.de
 info:
   contact: {}
-  description: This is the REST API of Project Lighthouse
-  title: Lighthouse API
-  version: "1.0"
+  description: |-
+    This is the REST API of Project Lighthouse that manages users, roles, registration keys, API tokens and everything about authentication and authorization.
+    NOTE: This API is an early alpha version that still needs a lot of testing (unit tests, end-to-end tests and security tests)
+  title: Heimdall Lighthouse API
+  version: "0.1"
 paths:
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Log in with username and password (sets a cookie with the session
+        id)
+      parameters:
+      - description: Username and Password
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/LoginPayload'
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: Login
+      tags:
+      - Users
+  /logout:
+    post:
+      consumes:
+      - application/json
+      description: Log out of the current session
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: Logout
+      tags:
+      - Users
   /register:
     post:
       consumes:
       - application/json
-      description: Creates a user with a registration key (no extra auth needed)
-      operationId: RegisterUser
+      description: Registers a new user using a registration key
+      parameters:
+      - description: Username, Password, Email, RegistrationKey
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/RegisterPayload'
       produces:
       - text/plain
       responses:
         "201":
           description: Created
-          schema:
-            type: string
         "400":
           description: Bad Request
-          schema:
-            type: string
-        "403":
-          description: Forbidden
-          schema:
-            type: string
+        "401":
+          description: Unauthorized
         "409":
           description: Conflict
-          schema:
-            type: string
         "500":
           description: Internal Server Error
-          schema:
-            type: string
-  /user:
-    post:
+      summary: Register user
+      tags:
+      - Users
+  /registration-keys:
+    get:
       consumes:
       - application/json
-      description: Creates a user without a registration key (permissions needed)
-      produces:
-      - text/plain
-      responses:
-        "201":
-          description: Created
-          schema:
-            type: string
-        "400":
-          description: Bad Request
-          schema:
-            type: string
-        "409":
-          description: Conflict
-          schema:
-            type: string
-        "500":
-          description: Internal Server Error
-          schema:
-            type: string
-  /user/{id}:
-    delete:
-      description: Creates a user with a registration key (no extra auth needed)
-      operationId: RegisterUser
-      produces:
-      - text/plain
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: string
-        "404":
-          description: Not Found
-          schema:
-            type: string
-    get:
-      description: Returns a user by id
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.User'
-        "400":
-          description: Bad Request
-          schema:
-            type: string
-        "404":
-          description: Not Found
-          schema:
-            type: string
-  /users:
-    get:
-      description: Returns a list of all users
+      description: Get a list of all registration keys or query a single registration
+        key by key (returns single object instead of list)
+      parameters:
+      - description: Registration Key
+        in: query
+        name: key
+        type: string
       produces:
       - application/json
       responses:
@@ -142,6 +247,649 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/model.User'
+              $ref: '#/definitions/RegistrationKey'
             type: array
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Get all registration keys or query by key
+      tags:
+      - RegistrationKeys
+    post:
+      consumes:
+      - application/json
+      description: Create a new registration key
+      parameters:
+      - description: key, description, permament, expires_at
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/CreateRegistrationKeyPayload'
+      produces:
+      - text/plain
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "409":
+          description: Conflict
+        "500":
+          description: Internal Server Error
+      summary: Create registration key
+      tags:
+      - RegistrationKeys
+  /registration-keys/{id}:
+    delete:
+      description: Delete a registration key by its id
+      parameters:
+      - description: Registration Key ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Delete registration key
+      tags:
+      - RegistrationKeys
+    get:
+      consumes:
+      - application/json
+      description: Get a registration key by its id
+      parameters:
+      - description: Registration Key ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/RegistrationKey'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Get registration key by id
+      tags:
+      - RegistrationKeys
+    put:
+      consumes:
+      - application/json
+      description: Upadte a registration key by its id
+      parameters:
+      - description: Registration Key ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: description, permament, expires_at
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/UpdateRegistrationKeyPayload'
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "500":
+          description: Internal Server Error
+      summary: Update registration key
+      tags:
+      - RegistrationKeys
+  /registration-keys/{id}/users:
+    get:
+      description: 'Get a list of users that registered using this registration key
+        by its id. NOTE: registration_key is not included for users'
+      parameters:
+      - description: Registration Key ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/User'
+            type: array
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Get users of registration key
+      tags:
+      - RegistrationKeys
+  /roles:
+    get:
+      description: Get a list of all roles or query a single role by name (returns
+        single object instead of list)
+      parameters:
+      - description: Role name
+        in: query
+        name: name
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Role'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Get all roles or query by name
+      tags:
+      - Roles
+    post:
+      consumes:
+      - application/json
+      description: Create a new role
+      parameters:
+      - description: Name
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/CreateOrUpdateRolePayload'
+      produces:
+      - text/plain
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "409":
+          description: Conflict
+        "500":
+          description: Internal Server Error
+      summary: Create role
+      tags:
+      - Roles
+  /roles/{id}:
+    delete:
+      description: Delete a role by its role id
+      parameters:
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Delete role
+      tags:
+      - Roles
+    get:
+      description: Get a role by its role id
+      parameters:
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Role'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Get role by id
+      tags:
+      - Roles
+    put:
+      consumes:
+      - application/json
+      description: Update a new role by its user id
+      parameters:
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Name
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/CreateOrUpdateRolePayload'
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "409":
+          description: Conflict
+        "500":
+          description: Internal Server Error
+      summary: Update role
+      tags:
+      - Roles
+  /roles/{id}/users:
+    get:
+      description: 'Get a list of users that have a role by its role id. NOTE: registration_key
+        is not included for users'
+      parameters:
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/User'
+            type: array
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Get users of role
+      tags:
+      - Roles
+  /roles/{roleid}/users/{userid}:
+    delete:
+      description: Remove a user (by its user id) from a role (by its role id)
+      parameters:
+      - description: Role ID
+        in: path
+        name: roleid
+        required: true
+        type: integer
+      - description: User ID
+        in: path
+        name: userid
+        required: true
+        type: integer
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Remove user from role
+      tags:
+      - Roles
+    put:
+      description: Add a user (by its user id) to a role (by its role id)
+      parameters:
+      - description: Role ID
+        in: path
+        name: roleid
+        required: true
+        type: integer
+      - description: User ID
+        in: path
+        name: userid
+        required: true
+        type: integer
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Add user to role
+      tags:
+      - Roles
+  /users:
+    get:
+      description: 'Get a list of all users or query a single user by name (returns
+        single object instead of list). NOTE: registration_key is only included when
+        querying a single user'
+      parameters:
+      - description: Username
+        in: query
+        name: name
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/User'
+            type: array
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Get all users or query by name
+      tags:
+      - Users
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user
+      parameters:
+      - description: Username, Password, Email, PermanentAPIToken
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/CreateOrUpdateUserPayload'
+      produces:
+      - text/plain
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "409":
+          description: Conflict
+        "500":
+          description: Internal Server Error
+      summary: Create user
+      tags:
+      - Users
+  /users/{id}:
+    delete:
+      description: Deletes a user given a user id
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Delete user
+      tags:
+      - Users
+    get:
+      description: Get a user by its user id
+      operationId: GetUserByName
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/User'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Get user by id
+      tags:
+      - Users
+    put:
+      consumes:
+      - application/json
+      description: Updates a user (always updates all fields, partial updates currently
+        not supported)
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Username, Password, Email, PermanentAPIToken
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/CreateOrUpdateUserPayload'
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "409":
+          description: Conflict
+        "500":
+          description: Internal Server Error
+      summary: Update user
+      tags:
+      - Users
+  /users/{id}/api-token:
+    delete:
+      description: Given a valid user id, invalidates the current API token and generates
+        a new one
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/APIToken'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Renew a user's API token
+      tags:
+      - Users
+    get:
+      description: Given a valid user id, returns the username, API token, associated
+        roles and expiration date
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/APIToken'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Get a user's API token
+      tags:
+      - Users
+  /users/{id}/roles:
+    get:
+      description: Get a list of roles that a user posesses
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/Role'
+            type: array
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Get roles of user
+      tags:
+      - Users
 swagger: "2.0"

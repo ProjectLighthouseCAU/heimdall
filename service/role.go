@@ -1,45 +1,33 @@
 package service
 
 import (
+	"log"
+
 	"lighthouse.uni-kiel.de/lighthouse-api/model"
 	"lighthouse.uni-kiel.de/lighthouse-api/repository"
 )
 
-type RoleService interface {
-	GetAll() ([]model.Role, error)
-	GetByID(id uint) (*model.Role, error)
-	GetByName(name string) (*model.Role, error)
-	Create(rolename string) error
-	Update(id uint, rolename string) error
-	DeleteByID(id uint) error
-	GetUsersOfRole(id uint) ([]model.User, error)
-	AddUserToRole(roleid, userid uint) error
-	RemoveUserFromRole(roleid, userid uint) error
-}
-
-type roleService struct {
+type RoleService struct {
 	roleRepository repository.RoleRepository
 	userRepository repository.UserRepository
+	tokenService   TokenService
 }
 
-var _ RoleService = (*roleService)(nil) // compile-time interface check
-
-func NewRoleService(rr repository.RoleRepository, ur repository.UserRepository) *roleService {
-	return &roleService{
-		roleRepository: rr,
-		userRepository: ur,
-	}
+func NewRoleService(roleRepo repository.RoleRepository,
+	userRepo repository.UserRepository,
+	tokenService TokenService) RoleService {
+	return RoleService{roleRepo, userRepo, tokenService}
 }
 
-func (r *roleService) GetAll() ([]model.Role, error) {
+func (r *RoleService) GetAll() ([]model.Role, error) {
 	return r.roleRepository.FindAll()
 }
 
-func (r *roleService) GetByID(id uint) (*model.Role, error) {
+func (r *RoleService) GetByID(id uint) (*model.Role, error) {
 	return r.roleRepository.FindByID(id)
 }
 
-func (r *roleService) GetByName(name string) (*model.Role, error) {
+func (r *RoleService) GetByName(name string) (*model.Role, error) {
 	return r.roleRepository.FindByName(name)
 }
 
@@ -50,15 +38,18 @@ func validateRole(rolename string) error {
 	return nil
 }
 
-func (r *roleService) checkIfRoleExists(rolename string) error {
-	_, err := r.roleRepository.FindByName(rolename)
-	if err == nil {
+func (r *RoleService) checkIfRoleExists(rolename string) error {
+	exists, err := r.roleRepository.ExistsByName(rolename)
+	if err != nil {
+		return model.InternalServerError{Err: err}
+	}
+	if exists {
 		return model.ConflictError{Message: "Role already exists"}
 	}
 	return nil
 }
 
-func (r *roleService) Create(rolename string) error {
+func (r *RoleService) Create(rolename string) error {
 	if err := validateRole(rolename); err != nil {
 		return err
 	}
@@ -71,23 +62,64 @@ func (r *roleService) Create(rolename string) error {
 	return r.roleRepository.Save(&role)
 }
 
-func (r *roleService) Update(id uint, rolename string) error {
+func (r *RoleService) Update(id uint, rolename string) error {
 	role, err := r.roleRepository.FindByID(id)
 	if err != nil {
 		return err
 	}
+	if rolename == role.Name {
+		return nil
+	}
 	if !isValidName(rolename) {
 		return model.BadRequestError{Message: "Invalid name"}
 	}
+
+	// save role
 	role.Name = rolename
-	return r.roleRepository.Save(role)
+	err = r.roleRepository.Save(role)
+	if err != nil {
+		return err
+	}
+
+	// get users of role for token update
+	users, err := r.GetUsersOfRole(id)
+	if err != nil {
+		return model.InternalServerError{Message: "Could not get users of role for invalidating tokens", Err: err}
+	}
+
+	// update roles in redis
+	for _, user := range users {
+		r.tokenService.UpdateRolesIfExists(&user)
+	}
+	return nil
 }
 
-func (r *roleService) DeleteByID(id uint) error {
-	return r.roleRepository.DeleteByID(id)
+func (r *RoleService) DeleteByID(id uint) error {
+	// get users of role before deletion
+	users, err := r.GetUsersOfRole(id)
+	if err != nil {
+		return model.InternalServerError{Message: "Could not get users of role for invalidating tokens", Err: err}
+	}
+
+	// delete role
+	err = r.roleRepository.DeleteByID(id)
+	if err != nil {
+		return err
+	}
+
+	// query the users of the deleted role and update the roles in redis
+	for _, user := range users {
+		updatedUser, err := r.userRepository.FindByID(user.ID)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		r.tokenService.UpdateRolesIfExists(updatedUser)
+	}
+	return nil
 }
 
-func (r *roleService) GetUsersOfRole(roleid uint) ([]model.User, error) {
+func (r *RoleService) GetUsersOfRole(roleid uint) ([]model.User, error) {
 	role, err := r.roleRepository.FindByID(roleid)
 	if err != nil {
 		return nil, err
@@ -99,7 +131,7 @@ func (r *roleService) GetUsersOfRole(roleid uint) ([]model.User, error) {
 	return users, nil
 }
 
-func (r *roleService) AddUserToRole(roleid, userid uint) error {
+func (r *RoleService) AddUserToRole(roleid, userid uint) error {
 	role, err := r.roleRepository.FindByID(roleid)
 	if err != nil {
 		return err
@@ -108,10 +140,21 @@ func (r *roleService) AddUserToRole(roleid, userid uint) error {
 	if err != nil {
 		return err
 	}
-	return r.roleRepository.AddUserToRole(role, user)
+	err = r.roleRepository.AddUserToRole(role, user)
+	if err != nil {
+		return err
+	}
+	// query user again after update
+	user, err = r.userRepository.FindByID(userid)
+	if err != nil {
+		return err
+	}
+	// update roles in redis
+	_, err = r.tokenService.UpdateRolesIfExists(user)
+	return err
 }
 
-func (r *roleService) RemoveUserFromRole(roleid, userid uint) error {
+func (r *RoleService) RemoveUserFromRole(roleid, userid uint) error {
 	role, err := r.roleRepository.FindByID(roleid)
 	if err != nil {
 		return err
@@ -120,5 +163,16 @@ func (r *roleService) RemoveUserFromRole(roleid, userid uint) error {
 	if err != nil {
 		return err
 	}
-	return r.roleRepository.RemoveUserFromRole(role, user)
+	err = r.roleRepository.RemoveUserFromRole(role, user)
+	if err != nil {
+		return err
+	}
+	// query user again after update
+	user, err = r.userRepository.FindByID(userid)
+	if err != nil {
+		return err
+	}
+	// update roles in redis
+	_, err = r.tokenService.UpdateRolesIfExists(user)
+	return err
 }

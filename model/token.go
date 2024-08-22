@@ -1,15 +1,12 @@
 package model
 
-// type Token struct { // TODO: maybe remove this and use JWT instead
-// 	Model
+import "time"
 
-// 	Token string `gorm:"not null" json:"token"`
-// 	// IssuedAt  time.Time --> gorm.Model.CreatedAt
-// 	ExpiresAt time.Time `gorm:"not null" json:"expires_at"`
-
-// 	UserID uint // foreign key
-// }
-
-type Token struct {
-	Token string `json:"token"`
-}
+// @Description API token that allows access to the websocket API (beacon) and probably other APIs in the future
+// Note: API tokens are persisted in Redis and therefore have no gorm annotations and do not include Model
+type APIToken struct {
+	Token     string    `json:"api_token"`  // the actual API token
+	Username  string    `json:"username"`   // unique username associated with this token
+	Roles     []string  `json:"roles"`      // roles associated with this token
+	ExpiresAt time.Time `json:"expires_at"` // expiration date of this token
+} //@name APIToken

@@ -8,7 +8,7 @@ import (
 	"lighthouse.uni-kiel.de/lighthouse-api/model"
 )
 
-func unwrapAndSendError(c *fiber.Ctx, err error) error {
+func UnwrapAndSendError(c *fiber.Ctx, err error) error {
 	fmt.Println(err)
 	switch t := err.(type) {
 	case model.BadRequestError:
@@ -25,6 +25,6 @@ func unwrapAndSendError(c *fiber.Ctx, err error) error {
 		return c.Status(fiber.StatusInternalServerError).SendString(fmt.Sprintf("%d %s", fiber.StatusInternalServerError, err.Error()))
 	default:
 		log.Printf("Could not unwrap error: %v of type: %T\n", err, t)
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
+		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 }

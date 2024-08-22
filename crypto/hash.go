@@ -8,7 +8,7 @@ import (
 	"lighthouse.uni-kiel.de/lighthouse-api/config"
 )
 
-var optimalCost = calculateOptimalCost()
+var optimalCost = config.GetInt("BCRYPT_COST_FACTOR", calculateOptimalCost())
 
 func HashPassword(password string) ([]byte, error) {
 	return bcrypt.GenerateFromPassword([]byte(password), optimalCost)
@@ -31,6 +31,10 @@ func calculateOptimalCost() int {
 	for duration.Milliseconds() < int64(config.GetInt("HASHING_TIME_MS", 250)) {
 		cost += 1
 		duration *= 2
+	}
+	// the minimum hashing cost should be 10 for security reasons
+	if cost < 10 {
+		cost = 10
 	}
 	log.Printf("	Setting optimal bcrypt hashing cost factor to: %d\n", cost)
 	return cost
