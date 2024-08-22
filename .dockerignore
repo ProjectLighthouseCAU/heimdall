@@ -1,0 +1,9 @@
+.git
+.gitignore
+.github
+.dockerignore
+Dockerfile
+*.md
+docker-compose*.yaml
+heimdall*
+Makefile
