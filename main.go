@@ -52,7 +52,6 @@ func main() {
 	if err != nil {
 		log.Println(err)
 	}
-	log.Println("	Connected to database")
 
 	storage := fiberRedis.New(fiberRedis.Config{
 		Host:      config.GetString("REDIS_HOST", "127.0.0.1"),
@@ -135,7 +134,7 @@ func main() {
 	routa.Init()
 	printRoutes(routa.ListRoutes())
 
-	log.Println("Setup done. Listening...")
+	log.Println("Setup done. Listening until Ragnarök...")
 	log.Fatal(app.Listen(":8080"))
 }
 
