@@ -1,4 +1,4 @@
-basePath: /api/
+basePath: /api
 definitions:
   APIToken:
     description: API token that allows access to the websocket API (beacon) and probably

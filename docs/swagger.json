@@ -7,7 +7,7 @@
         "version": "0.1"
     },
     "host": "https://lighthouse.uni-kiel.de",
-    "basePath": "/api/",
+    "basePath": "/api",
     "paths": {
         "/login": {
             "post": {

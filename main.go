@@ -18,7 +18,7 @@ import (
 	"lighthouse.uni-kiel.de/lighthouse-api/config"
 	"lighthouse.uni-kiel.de/lighthouse-api/controller"
 	"lighthouse.uni-kiel.de/lighthouse-api/database"
-	_ "lighthouse.uni-kiel.de/lighthouse-api/docs"
+	"lighthouse.uni-kiel.de/lighthouse-api/docs"
 	"lighthouse.uni-kiel.de/lighthouse-api/middleware"
 	"lighthouse.uni-kiel.de/lighthouse-api/model"
 	"lighthouse.uni-kiel.de/lighthouse-api/repository"
@@ -31,8 +31,11 @@ import (
 // @Description	This is the REST API of Project Lighthouse that manages users, roles, registration keys, API tokens and everything about authentication and authorization.
 // @Description NOTE: This API is an early alpha version that still needs a lot of testing (unit tests, end-to-end tests and security tests)
 // @Host		https://lighthouse.uni-kiel.de
-// @BasePath	/api/
+// @BasePath	/api
 func main() {
+	docs.SwaggerInfo.Host = config.GetString("API_HOST", "https://lighthouse.uni-kiel.de")
+	docs.SwaggerInfo.BasePath = config.GetString("API_BASE_PATH", "/api")
+
 	log.Println("Starting Heimdall")
 	app := fiber.New(fiber.Config{
 		AppName:       "Heimdall",
