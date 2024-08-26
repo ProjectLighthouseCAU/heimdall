@@ -35,24 +35,12 @@ func NewRouter(app *fiber.App,
 	return Router{app, userContr, regKeyContr, roleContr, tokenContr, sessionMiddleware}
 }
 
-// //go:embed Heimdall_OpenAPI.yaml
-// var f embed.FS
-
 func (r *Router) Init() {
 	r.app.Use(logger.New())
 	r.app.Use(recover.New())
 	// app.Use(csrf.New()) // FIXME: csrf prevents everything except GET requests
 	r.app.Use(cors.New(cors.Config{
-		AllowOrigins: strings.Join([]string{config.GetString("API_HOST", "https://lighthouse.uni-kiel.de"), "http://localhost"}, ","), // TODO: remove localhost in production
-		AllowMethods: strings.Join([]string{
-			fiber.MethodGet,
-			fiber.MethodPost,
-			fiber.MethodHead,
-			fiber.MethodPut,
-			fiber.MethodDelete,
-			fiber.MethodPatch,
-			fiber.MethodOptions,
-		}, ","),
+		AllowOrigins: strings.Join([]string{config.GetString("API_HOST", "https://lighthouse.uni-kiel.de"), config.GetString("CORS_ALLOW_ORIGINS", "http://localhost")}, ","), // TODO: remove localhost in production
 	}))
 	r.app.Use(limiter.New(limiter.Config{
 		Max:        300,
