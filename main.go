@@ -68,10 +68,13 @@ func main() {
 	})
 
 	store := session.New(session.Config{
-		Storage:      storage,
-		Expiration:   24 * time.Hour,
-		KeyLookup:    "cookie:session_id",
-		KeyGenerator: utils.UUIDv4,
+		Storage:        storage,
+		Expiration:     24 * time.Hour,
+		KeyLookup:      "cookie:session_id",
+		KeyGenerator:   utils.UUIDv4,
+		CookieSecure:   true,
+		CookieSameSite: "None", // TODO: change to Lax or Strict in production
+		CookieHTTPOnly: true,
 	})
 
 	// repositories

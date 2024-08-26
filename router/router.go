@@ -1,6 +1,7 @@
 package router
 
 import (
+	"strings"
 	"time"
 
 	swagger "github.com/arsmn/fiber-swagger/v2"
@@ -38,14 +39,12 @@ func NewRouter(app *fiber.App,
 // var f embed.FS
 
 func (r *Router) Init() {
-	// r.app.Use("/docs", filesystem.New(filesystem.Config{
-	// 	Root:   http.FS(f),
-	// 	Browse: true,
-	// }))
 	r.app.Use(logger.New())
 	r.app.Use(recover.New())
 	// app.Use(csrf.New()) // FIXME: csrf prevents everything except GET requests
-	r.app.Use(cors.New())
+	r.app.Use(cors.New(cors.Config{
+		AllowOrigins: strings.Join([]string{config.GetString("API_HOST", "https://lighthouse.uni-kiel.de"), "localhost"}, ","), // TODO: remove localhost in production
+	}))
 	r.app.Use(limiter.New(limiter.Config{
 		Max:        300,
 		Expiration: 1 * time.Minute,
