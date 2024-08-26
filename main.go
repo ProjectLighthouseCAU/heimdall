@@ -74,7 +74,7 @@ func main() {
 		KeyGenerator:   utils.UUIDv4,
 		CookieSecure:   false,  // TODO: change to true in production
 		CookieSameSite: "None", // TODO: change to Lax or Strict in production
-		CookieHTTPOnly: true,
+		CookieHTTPOnly: false,  // TODO: change to true in production
 	})
 
 	// repositories
