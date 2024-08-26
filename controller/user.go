@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"fmt"
-
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/session"
 	"lighthouse.uni-kiel.de/lighthouse-api/model"
@@ -82,7 +80,6 @@ func (uc *UserController) GetByID(c *fiber.Ctx) error {
 	if err != nil {
 		return UnwrapAndSendError(c, err)
 	}
-	fmt.Printf("%+v", user)
 	return c.JSON(user)
 }
 
