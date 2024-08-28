@@ -91,7 +91,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "produces": [
-                    "text/plain"
+                    "application/json"
                 ],
                 "tags": [
                     "Users"
@@ -110,7 +110,10 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "Created"
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/User"
+                        }
                     },
                     "400": {
                         "description": "Bad Request"

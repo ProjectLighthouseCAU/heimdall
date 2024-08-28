@@ -217,10 +217,12 @@ paths:
         schema:
           $ref: '#/definitions/RegisterPayload'
       produces:
-      - text/plain
+      - application/json
       responses:
         "201":
           description: Created
+          schema:
+            $ref: '#/definitions/User'
         "400":
           description: Bad Request
         "401":
