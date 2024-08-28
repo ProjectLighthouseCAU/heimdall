@@ -18,6 +18,14 @@ The packages `config`, `crypto` and `database` contain some utility functions.
 The `model` package defines the types of the domain (user, role, registration-key and token).  
 Users, roles, registration-keys and their relations are stored in the SQL database (PostgreSQL) but user sessions and API-tokens are stored in redis (currently without an extra repository layer).
 
+## Libraries
+This project uses fiber as the web-framework/library (https://gofiber.io/),  
+GORM as the ORM (https://gorm.io/) with the postgres driver  
+and go-redis (https://github.com/redis/go-redis) as the redis client.  
+For the generated swagger documentation, we use swag (https://github.com/swaggo/swag).  
+Furthermore, we use libraries for input validation (https://github.com/asaskevich/govalidator)  
+and cryptography (password hashing) (https://pkg.go.dev/golang.org/x/crypto).
+
 ## Build and Run
 
 ### Run/Build locally for development
