@@ -3,8 +3,8 @@ package service
 import (
 	"strings"
 
+	"github.com/ProjectLighthouseCAU/heimdall/config"
 	"github.com/asaskevich/govalidator"
-	"lighthouse.uni-kiel.de/lighthouse-api/config"
 )
 
 func isValidName(str string) bool {

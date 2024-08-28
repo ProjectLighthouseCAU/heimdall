@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/ProjectLighthouseCAU/heimdall/crypto"
+	"github.com/ProjectLighthouseCAU/heimdall/model"
 	"github.com/redis/go-redis/v9"
-	"lighthouse.uni-kiel.de/lighthouse-api/crypto"
-	"lighthouse.uni-kiel.de/lighthouse-api/model"
 )
 
 type TokenService struct {

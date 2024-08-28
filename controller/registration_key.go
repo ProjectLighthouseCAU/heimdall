@@ -3,8 +3,8 @@ package controller
 import (
 	"time"
 
+	"github.com/ProjectLighthouseCAU/heimdall/service"
 	"github.com/gofiber/fiber/v2"
-	"lighthouse.uni-kiel.de/lighthouse-api/service"
 )
 
 type RegistrationKeyController struct {

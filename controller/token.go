@@ -1,8 +1,8 @@
 package controller
 
 import (
+	"github.com/ProjectLighthouseCAU/heimdall/service"
 	"github.com/gofiber/fiber/v2"
-	"lighthouse.uni-kiel.de/lighthouse-api/service"
 )
 
 type TokenController struct {

@@ -3,10 +3,10 @@ package service
 import (
 	"time"
 
+	"github.com/ProjectLighthouseCAU/heimdall/crypto"
+	"github.com/ProjectLighthouseCAU/heimdall/model"
+	"github.com/ProjectLighthouseCAU/heimdall/repository"
 	"github.com/gofiber/fiber/v2/middleware/session"
-	"lighthouse.uni-kiel.de/lighthouse-api/crypto"
-	"lighthouse.uni-kiel.de/lighthouse-api/model"
-	"lighthouse.uni-kiel.de/lighthouse-api/repository"
 )
 
 type UserService struct {

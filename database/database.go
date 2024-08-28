@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ProjectLighthouseCAU/heimdall/config"
+	"github.com/ProjectLighthouseCAU/heimdall/model"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"lighthouse.uni-kiel.de/lighthouse-api/config"
-	"lighthouse.uni-kiel.de/lighthouse-api/model"
 )
 
 // ConnectPostgres opens a connection to the PostgreSQL database for GORM to use

@@ -4,8 +4,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/ProjectLighthouseCAU/heimdall/config"
 	"golang.org/x/crypto/bcrypt"
-	"lighthouse.uni-kiel.de/lighthouse-api/config"
 )
 
 var optimalCost = config.GetInt("BCRYPT_COST_FACTOR", calculateOptimalCost())

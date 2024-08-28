@@ -1,10 +1,10 @@
 package controller
 
 import (
+	"github.com/ProjectLighthouseCAU/heimdall/model"
+	"github.com/ProjectLighthouseCAU/heimdall/service"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/session"
-	"lighthouse.uni-kiel.de/lighthouse-api/model"
-	"lighthouse.uni-kiel.de/lighthouse-api/service"
 )
 
 type UserController struct {

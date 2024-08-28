@@ -1,9 +1,9 @@
 package repository
 
 import (
+	"github.com/ProjectLighthouseCAU/heimdall/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"lighthouse.uni-kiel.de/lighthouse-api/model"
 )
 
 type RoleRepository struct {

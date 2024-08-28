@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/ProjectLighthouseCAU/heimdall/model"
 	"github.com/gofiber/fiber/v2"
-	"lighthouse.uni-kiel.de/lighthouse-api/model"
 )
 
 func UnwrapAndSendError(c *fiber.Ctx, err error) error {

@@ -4,6 +4,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ProjectLighthouseCAU/heimdall/config"
+	"github.com/ProjectLighthouseCAU/heimdall/controller"
+	"github.com/ProjectLighthouseCAU/heimdall/middleware"
 	swagger "github.com/arsmn/fiber-swagger/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -12,9 +15,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/monitor"
 	"github.com/gofiber/fiber/v2/middleware/pprof"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"lighthouse.uni-kiel.de/lighthouse-api/config"
-	"lighthouse.uni-kiel.de/lighthouse-api/controller"
-	"lighthouse.uni-kiel.de/lighthouse-api/middleware"
 )
 
 type Router struct {

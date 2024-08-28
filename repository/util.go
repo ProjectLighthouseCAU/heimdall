@@ -3,8 +3,8 @@ package repository
 import (
 	"errors"
 
+	"github.com/ProjectLighthouseCAU/heimdall/model"
 	"gorm.io/gorm"
-	"lighthouse.uni-kiel.de/lighthouse-api/model"
 )
 
 // wraps an error with a custom error type

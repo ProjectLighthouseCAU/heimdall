@@ -3,10 +3,10 @@ package service
 import (
 	"time"
 
-	"lighthouse.uni-kiel.de/lighthouse-api/config"
-	"lighthouse.uni-kiel.de/lighthouse-api/crypto"
-	"lighthouse.uni-kiel.de/lighthouse-api/model"
-	"lighthouse.uni-kiel.de/lighthouse-api/repository"
+	"github.com/ProjectLighthouseCAU/heimdall/config"
+	"github.com/ProjectLighthouseCAU/heimdall/crypto"
+	"github.com/ProjectLighthouseCAU/heimdall/model"
+	"github.com/ProjectLighthouseCAU/heimdall/repository"
 )
 
 type RegistrationKeyService struct {

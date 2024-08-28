@@ -3,8 +3,8 @@ package service
 import (
 	"log"
 
-	"lighthouse.uni-kiel.de/lighthouse-api/model"
-	"lighthouse.uni-kiel.de/lighthouse-api/repository"
+	"github.com/ProjectLighthouseCAU/heimdall/model"
+	"github.com/ProjectLighthouseCAU/heimdall/repository"
 )
 
 type RoleService struct {

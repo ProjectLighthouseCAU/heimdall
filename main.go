@@ -8,6 +8,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ProjectLighthouseCAU/heimdall/config"
+	"github.com/ProjectLighthouseCAU/heimdall/controller"
+	"github.com/ProjectLighthouseCAU/heimdall/database"
+	"github.com/ProjectLighthouseCAU/heimdall/docs"
+	"github.com/ProjectLighthouseCAU/heimdall/middleware"
+	"github.com/ProjectLighthouseCAU/heimdall/model"
+	"github.com/ProjectLighthouseCAU/heimdall/repository"
+	"github.com/ProjectLighthouseCAU/heimdall/router"
+	"github.com/ProjectLighthouseCAU/heimdall/service"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/session"
 	"github.com/gofiber/fiber/v2/utils"
@@ -15,15 +24,6 @@ import (
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"lighthouse.uni-kiel.de/lighthouse-api/config"
-	"lighthouse.uni-kiel.de/lighthouse-api/controller"
-	"lighthouse.uni-kiel.de/lighthouse-api/database"
-	"lighthouse.uni-kiel.de/lighthouse-api/docs"
-	"lighthouse.uni-kiel.de/lighthouse-api/middleware"
-	"lighthouse.uni-kiel.de/lighthouse-api/model"
-	"lighthouse.uni-kiel.de/lighthouse-api/repository"
-	"lighthouse.uni-kiel.de/lighthouse-api/router"
-	"lighthouse.uni-kiel.de/lighthouse-api/service"
 )
 
 // @Title		Heimdall Lighthouse API
