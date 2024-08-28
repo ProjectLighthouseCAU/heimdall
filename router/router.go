@@ -40,7 +40,8 @@ func (r *Router) Init() {
 	r.app.Use(recover.New())
 	// app.Use(csrf.New()) // FIXME: csrf prevents everything except GET requests
 	r.app.Use(cors.New(cors.Config{
-		AllowOrigins: strings.Join([]string{config.GetString("API_HOST", "https://lighthouse.uni-kiel.de"), config.GetString("CORS_ALLOW_ORIGINS", "http://localhost")}, ","), // TODO: remove localhost in production
+		AllowOrigins:     strings.Join([]string{config.GetString("API_HOST", "https://lighthouse.uni-kiel.de"), config.GetString("CORS_ALLOW_ORIGINS", "http://localhost")}, ","), // TODO: remove localhost in production
+		AllowCredentials: true,                                                                                                                                                    // TODO: remove in production
 	}))
 	r.app.Use(limiter.New(limiter.Config{
 		Max:        300,
