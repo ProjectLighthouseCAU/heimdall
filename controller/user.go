@@ -148,9 +148,9 @@ type RegisterPayload struct {
 // @Description  Registers a new user using a registration key
 // @Tags         Users
 // @Accept       json
-// @Produce      plain
+// @Produce      json
 // @Param        payload  body  RegisterPayload  true  "Username, Password, Email, RegistrationKey"
-// @Success      201  "Created"
+// @Success      201  {object}  model.User
 // @Failure      400  "Bad Request"
 // @Failure      401  "Unauthorized"
 // @Failure      409  "Conflict"
@@ -166,11 +166,11 @@ func (uc *UserController) Register(c *fiber.Ctx) error {
 	if err != nil {
 		return UnwrapAndSendError(c, model.InternalServerError{Message: "Could not get session", Err: err})
 	}
-	err = uc.userService.Register(payload.Username, payload.Password, payload.Email, payload.RegistrationKey, session)
+	user, err := uc.userService.Register(payload.Username, payload.Password, payload.Email, payload.RegistrationKey, session)
 	if err != nil {
 		return UnwrapAndSendError(c, err)
 	}
-	return c.SendStatus(fiber.StatusCreated)
+	return c.Status(fiber.StatusCreated).JSON(user)
 }
 
 type CreateOrUpdateUserPayload struct {

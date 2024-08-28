@@ -100,29 +100,29 @@ func (s *UserService) checkIfUserExists(username string) error {
 	return nil
 }
 
-func (s *UserService) Register(username, password, email, registrationKey string, session *session.Session) error {
+func (s *UserService) Register(username, password, email, registrationKey string, session *session.Session) (*model.User, error) {
 	key, err := s.registrationKeyRepository.FindByKey(registrationKey)
 	if err != nil {
 		switch err.(type) {
 		case *model.NotFoundError:
-			return model.UnauthorizedError{Message: "invalid registration key", Err: err}
+			return nil, model.UnauthorizedError{Message: "invalid registration key", Err: err}
 		}
-		return err
+		return nil, err
 	}
 	// check if registration key is expired
 	if time.Now().After(key.ExpiresAt) && !key.Permanent {
-		return model.UnauthorizedError{Message: "registration key expired"}
+		return nil, model.UnauthorizedError{Message: "registration key expired"}
 	}
 
 	if err := validateUser(username, password, email); err != nil {
-		return err
+		return nil, err
 	}
 	if err := s.checkIfUserExists(username); err != nil {
-		return err
+		return nil, err
 	}
 	hashedPassword, err := crypto.HashPassword(password)
 	if err != nil {
-		return model.InternalServerError{Message: "could not hash password", Err: err}
+		return nil, model.InternalServerError{Message: "could not hash password", Err: err}
 	}
 	now := time.Now()
 	user := model.User{
@@ -134,19 +134,19 @@ func (s *UserService) Register(username, password, email, registrationKey string
 	}
 	err = s.userRepository.Save(&user)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	savedUser, err := s.userRepository.FindByName(user.Username)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	session.Set("userid", savedUser.ID)
 	err = session.Save()
 	if err != nil {
-		return model.InternalServerError{Message: "could not save session", Err: err}
+		return nil, model.InternalServerError{Message: "could not save session", Err: err}
 	}
-	s.tokenService.GenerateApiTokenIfNotExists(&user)
-	return nil
+	s.tokenService.GenerateApiTokenIfNotExists(savedUser)
+	return savedUser, nil
 }
 
 func (s *UserService) Create(username, password, email string, permanentAPIToken bool) error {
