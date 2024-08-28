@@ -35,34 +35,38 @@ func (s *UserService) GetByName(name string) (*model.User, error) {
 	return s.userRepository.FindByName(name)
 }
 
-func (s *UserService) Login(username, password string, session *session.Session) error {
+func (s *UserService) Login(username, password string, session *session.Session) (*model.User, error) {
 	userid := session.Get("userid")
-	if userid != nil {
-		return nil // already logged in
+	if userid != nil { // already logged in
+		uid, ok := userid.(uint)
+		if !ok {
+			return nil, model.InternalServerError{Message: "Error retrieving userid from session"}
+		}
+		return s.userRepository.FindByID(uid)
 	}
 	user, err := s.userRepository.FindByName(username)
 	// don't leak if username exists -> both cases return the same response
 	if err != nil {
-		return model.UnauthorizedError{Message: "Invalid credentials", Err: nil}
+		return nil, model.UnauthorizedError{Message: "Invalid credentials", Err: nil}
 	}
 	if !crypto.PasswordMatchesHash(password, user.Password) {
-		return model.UnauthorizedError{Message: "Invalid credentials", Err: nil}
+		return nil, model.UnauthorizedError{Message: "Invalid credentials", Err: nil}
 	}
 
 	session.Set("userid", user.ID)
 	err = session.Save()
 	if err != nil {
-		return model.InternalServerError{Message: "Could not save session", Err: err}
+		return nil, model.InternalServerError{Message: "Could not save session", Err: err}
 	}
 
 	now := time.Now()
 	user.LastLogin = &now
 	err = s.userRepository.Save(user)
 	if err != nil {
-		return model.InternalServerError{Message: "Could not save user", Err: err}
+		return nil, model.InternalServerError{Message: "Could not save user", Err: err}
 	}
 	s.tokenService.GenerateApiTokenIfNotExists(user)
-	return nil
+	return user, nil
 }
 
 func (s *UserService) Logout(session *session.Session) error {

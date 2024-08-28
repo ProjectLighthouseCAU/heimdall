@@ -89,12 +89,12 @@ type LoginPayload struct {
 } //@name LoginPayload
 
 // @Summary      Login
-// @Description  Log in with username and password (sets a cookie with the session id)
+// @Description  Log in with username and password (sets a cookie with the session id). Returns the full user information if the login was successful or the user is already logged in.
 // @Tags         Users
 // @Accept       json
-// @Produce      plain
+// @Produce      json
 // @Param        payload  body  LoginPayload  true  "Username and Password"
-// @Success      200  "OK"
+// @Success      200  {object}  model.User
 // @Failure      400  "Bad Request"
 // @Failure      401  "Unauthorized"
 // @Failure      500  "Internal Server Error"
@@ -109,11 +109,11 @@ func (uc *UserController) Login(c *fiber.Ctx) error {
 	if err != nil {
 		return UnwrapAndSendError(c, model.InternalServerError{Message: "Could not get session", Err: err})
 	}
-	err = uc.userService.Login(payload.Username, payload.Password, session)
+	user, err := uc.userService.Login(payload.Username, payload.Password, session)
 	if err != nil {
 		return UnwrapAndSendError(c, err)
 	}
-	return c.SendStatus(fiber.StatusOK)
+	return c.JSON(user)
 }
 
 // @Summary      Logout

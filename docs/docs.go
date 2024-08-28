@@ -17,12 +17,12 @@ const docTemplate = `{
     "paths": {
         "/login": {
             "post": {
-                "description": "Log in with username and password (sets a cookie with the session id)",
+                "description": "Log in with username and password (sets a cookie with the session id). Returns the full user information if the login was successful or the user is already logged in.",
                 "consumes": [
                     "application/json"
                 ],
                 "produces": [
-                    "text/plain"
+                    "application/json"
                 ],
                 "tags": [
                     "Users"
@@ -41,7 +41,10 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/User"
+                        }
                     },
                     "400": {
                         "description": "Bad Request"
