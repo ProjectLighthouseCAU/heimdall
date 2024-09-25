@@ -140,10 +140,12 @@ func (s *UserService) Register(username, password, email, registrationKey string
 	if err != nil {
 		return nil, err
 	}
-	session.Set("userid", savedUser.ID)
-	err = session.Save()
-	if err != nil {
-		return nil, model.InternalServerError{Message: "could not save session", Err: err}
+	if session != nil {
+		session.Set("userid", savedUser.ID)
+		err = session.Save()
+		if err != nil {
+			return nil, model.InternalServerError{Message: "could not save session", Err: err}
+		}
 	}
 	s.tokenService.GenerateApiTokenIfNotExists(savedUser)
 	return savedUser, nil
