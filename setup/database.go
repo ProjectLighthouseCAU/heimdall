@@ -1,4 +1,4 @@
-package database
+package setup
 
 import (
 	"context"
@@ -10,10 +10,11 @@ import (
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
-// ConnectPostgres opens a connection to the PostgreSQL database for GORM to use
-func ConnectPostgres() (*gorm.DB, error) {
+// connectPostgres opens a connection to the PostgreSQL database for GORM to use
+func connectPostgres() (*gorm.DB, error) {
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
 		config.GetString("DB_HOST", "localhost"),
 		config.GetInt("DB_PORT", 5432),
@@ -26,6 +27,7 @@ func ConnectPostgres() (*gorm.DB, error) {
 	}), &gorm.Config{
 		TranslateError: true,
 		PrepareStmt:    true,
+		Logger:         logger.Default.LogMode(logger.Silent),
 	})
 
 	if err != nil {
@@ -42,7 +44,7 @@ func ConnectPostgres() (*gorm.DB, error) {
 	return db, nil
 }
 
-func ConnectRedis(dbNumber int) (*redis.Client, error) {
+func connectRedis(dbNumber int) (*redis.Client, error) {
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     config.GetString("REDIS_HOST", "127.0.0.1") + ":" + config.GetString("REDIS_PORT", "6379"),
 		Username: config.GetString("REDIS_USER", ""),
