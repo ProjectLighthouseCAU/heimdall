@@ -1,18 +1,18 @@
-package controller
+package handler
 
 import (
 	"github.com/ProjectLighthouseCAU/heimdall/service"
 	"github.com/gofiber/fiber/v2"
 )
 
-type TokenController struct {
+type TokenHandler struct {
 	tokenService service.TokenService
 	userService  service.UserService
 }
 
-func NewTokenController(tokenService service.TokenService,
-	userService service.UserService) TokenController {
-	return TokenController{tokenService, userService}
+func NewTokenHandler(tokenService service.TokenService,
+	userService service.UserService) TokenHandler {
+	return TokenHandler{tokenService, userService}
 }
 
 // @Summary      Get a user's API token
@@ -27,7 +27,7 @@ func NewTokenController(tokenService service.TokenService,
 // @Failure      404  "Not Found"
 // @Failure      500  "Internal Server Error"
 // @Router       /users/{id}/api-token [get]
-func (tc *TokenController) Get(c *fiber.Ctx) error {
+func (tc *TokenHandler) Get(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
@@ -55,7 +55,7 @@ func (tc *TokenController) Get(c *fiber.Ctx) error {
 // @Failure      404  "Not Found"
 // @Failure      500  "Internal Server Error"
 // @Router       /users/{id}/api-token [delete]
-func (tc *TokenController) Delete(c *fiber.Ctx) error {
+func (tc *TokenHandler) Delete(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)

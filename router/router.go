@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/ProjectLighthouseCAU/heimdall/config"
-	"github.com/ProjectLighthouseCAU/heimdall/controller"
+	"github.com/ProjectLighthouseCAU/heimdall/handler"
 	"github.com/ProjectLighthouseCAU/heimdall/middleware"
 	swagger "github.com/arsmn/fiber-swagger/v2"
 	"github.com/gofiber/fiber/v2"
@@ -18,19 +18,19 @@ import (
 )
 
 type Router struct {
-	app                       *fiber.App
-	userController            controller.UserController
-	registrationKeyController controller.RegistrationKeyController
-	roleController            controller.RoleController
-	tokenController           controller.TokenController
-	sessionMiddleware         fiber.Handler
+	app                    *fiber.App
+	userHandler            handler.UserHandler
+	registrationKeyHandler handler.RegistrationKeyHandler
+	roleHandler            handler.RoleHandler
+	tokenHandler           handler.TokenHandler
+	sessionMiddleware      fiber.Handler
 }
 
 func NewRouter(app *fiber.App,
-	userContr controller.UserController,
-	regKeyContr controller.RegistrationKeyController,
-	roleContr controller.RoleController,
-	tokenContr controller.TokenController,
+	userContr handler.UserHandler,
+	regKeyContr handler.RegistrationKeyHandler,
+	roleContr handler.RoleHandler,
+	tokenContr handler.TokenHandler,
 	sessionMiddleware fiber.Handler) Router {
 	return Router{app, userContr, regKeyContr, roleContr, tokenContr, sessionMiddleware}
 }
@@ -68,13 +68,13 @@ func (r *Router) Init() {
 	r.app.Get("/swagger", swag)
 	r.app.Get("/swagger/*", swag)
 
-	r.app.Post("/register", r.userController.Register)
-	r.app.Post("/login", r.userController.Login)
+	r.app.Post("/register", r.userHandler.Register)
+	r.app.Post("/login", r.userHandler.Login)
 
 	r.app.Use(r.sessionMiddleware)
 	r.app.Get("/metrics", monitor.New())
 
-	r.app.Post("/logout", r.userController.Logout)
+	r.app.Post("/logout", r.userHandler.Logout)
 	r.initUserRoutes()
 	r.initRegistrationKeyRoutes()
 	r.initRoleRoutes()
@@ -103,36 +103,36 @@ var admin = config.GetString("ADMIN_ROLENAME", "admin")
 
 func (r *Router) initUserRoutes() {
 	users := r.app.Group("/users")
-	users.Get("", r.userController.GetAll, middleware.AllowRole(admin), r.userController.GetByName)
-	users.Get("/:id<int>", middleware.AllowRoleOrOwnUserId(admin, "id"), r.userController.GetByID)
-	users.Post("", middleware.AllowRole(admin), r.userController.Create)
-	users.Put("/:id<int>", middleware.AllowRoleOrOwnUserId(admin, "id"), r.userController.Update)
-	users.Delete("/:id<int>", middleware.AllowRoleOrOwnUserId(admin, "id"), r.userController.Delete)
-	users.Get("/:id<int>/roles", middleware.AllowRoleOrOwnUserId(admin, "id"), r.userController.GetRolesOfUser)
-	users.Get("/:id/api-token", middleware.AllowRoleOrOwnUserId(admin, "id"), r.tokenController.Get)       // username, token, roles, expiration
-	users.Delete("/:id/api-token", middleware.AllowRoleOrOwnUserId(admin, "id"), r.tokenController.Delete) // invalidate and renew token
+	users.Get("", r.userHandler.GetAll, middleware.AllowRole(admin), r.userHandler.GetByName)
+	users.Get("/:id<int>", middleware.AllowRoleOrOwnUserId(admin, "id"), r.userHandler.GetByID)
+	users.Post("", middleware.AllowRole(admin), r.userHandler.Create)
+	users.Put("/:id<int>", middleware.AllowRoleOrOwnUserId(admin, "id"), r.userHandler.Update)
+	users.Delete("/:id<int>", middleware.AllowRoleOrOwnUserId(admin, "id"), r.userHandler.Delete)
+	users.Get("/:id<int>/roles", middleware.AllowRoleOrOwnUserId(admin, "id"), r.userHandler.GetRolesOfUser)
+	users.Get("/:id/api-token", middleware.AllowRoleOrOwnUserId(admin, "id"), r.tokenHandler.Get)       // username, token, roles, expiration
+	users.Delete("/:id/api-token", middleware.AllowRoleOrOwnUserId(admin, "id"), r.tokenHandler.Delete) // invalidate and renew token
 }
 
 func (r *Router) initRegistrationKeyRoutes() {
 	keys := r.app.Group("/registration-keys", middleware.AllowRole(admin))
-	keys.Get("", r.registrationKeyController.Get)
-	keys.Get("/:id<int>", r.registrationKeyController.GetByID)
-	keys.Post("", r.registrationKeyController.Create)
-	keys.Put("/:id<int>", r.registrationKeyController.Update)
-	keys.Delete("/:id<int>", r.registrationKeyController.Delete)
-	keys.Get("/:id<int>/users", r.registrationKeyController.GetUsersOfKey)
+	keys.Get("", r.registrationKeyHandler.Get)
+	keys.Get("/:id<int>", r.registrationKeyHandler.GetByID)
+	keys.Post("", r.registrationKeyHandler.Create)
+	keys.Put("/:id<int>", r.registrationKeyHandler.Update)
+	keys.Delete("/:id<int>", r.registrationKeyHandler.Delete)
+	keys.Get("/:id<int>/users", r.registrationKeyHandler.GetUsersOfKey)
 }
 
 func (r *Router) initRoleRoutes() {
 	roles := r.app.Group("/roles", middleware.AllowRole(admin))
-	roles.Get("", r.roleController.Get)
-	roles.Get("/:id<int>", r.roleController.GetByID)
-	roles.Post("", r.roleController.Create)
-	roles.Put("/:id<int>", r.roleController.Update)
-	roles.Delete("/:id<int>", r.roleController.Delete)
-	roles.Get("/:id<int>/users", r.roleController.GetUsersOfRole)
-	roles.Put("/:roleid<int>/users/:userid<int>", r.roleController.AddUserToRole)
-	roles.Delete("/:roleid<int>/users/:userid<int>", r.roleController.RemoveUserFromRole)
+	roles.Get("", r.roleHandler.Get)
+	roles.Get("/:id<int>", r.roleHandler.GetByID)
+	roles.Post("", r.roleHandler.Create)
+	roles.Put("/:id<int>", r.roleHandler.Update)
+	roles.Delete("/:id<int>", r.roleHandler.Delete)
+	roles.Get("/:id<int>/users", r.roleHandler.GetUsersOfRole)
+	roles.Put("/:roleid<int>/users/:userid<int>", r.roleHandler.AddUserToRole)
+	roles.Delete("/:roleid<int>/users/:userid<int>", r.roleHandler.RemoveUserFromRole)
 }
 
 func (r *Router) ListRoutes() map[string][]string {

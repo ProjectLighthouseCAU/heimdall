@@ -1,16 +1,16 @@
-package controller
+package handler
 
 import (
 	"github.com/ProjectLighthouseCAU/heimdall/service"
 	"github.com/gofiber/fiber/v2"
 )
 
-type RoleController struct {
+type RoleHandler struct {
 	roleService service.RoleService
 }
 
-func NewRoleController(roleService service.RoleService) RoleController {
-	return RoleController{roleService}
+func NewRoleHandler(roleService service.RoleService) RoleHandler {
+	return RoleHandler{roleService}
 }
 
 // @Summary      Get all roles or query by name
@@ -24,7 +24,7 @@ func NewRoleController(roleService service.RoleService) RoleController {
 // @Failure      404  "Not Found"
 // @Failure      500  "Internal Server Error"
 // @Router       /roles [get]
-func (rc *RoleController) Get(c *fiber.Ctx) error {
+func (rc *RoleHandler) Get(c *fiber.Ctx) error {
 	// query roles by name
 	name := c.Query("name", "")
 	if name != "" {
@@ -54,7 +54,7 @@ func (rc *RoleController) Get(c *fiber.Ctx) error {
 // @Failure      404  "Not Found"
 // @Failure      500  "Internal Server Error"
 // @Router       /roles/{id} [get]
-func (rc *RoleController) GetByID(c *fiber.Ctx) error {
+func (rc *RoleHandler) GetByID(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
@@ -83,7 +83,7 @@ type CreateOrUpdateRolePayload struct {
 // @Failure      409  "Conflict"
 // @Failure      500  "Internal Server Error"
 // @Router       /roles [post]
-func (rc *RoleController) Create(c *fiber.Ctx) error {
+func (rc *RoleHandler) Create(c *fiber.Ctx) error {
 	c.Accepts("application/json")
 	var payload CreateOrUpdateRolePayload
 	if err := c.BodyParser(&payload); err != nil {
@@ -110,7 +110,7 @@ func (rc *RoleController) Create(c *fiber.Ctx) error {
 // @Failure      409  "Conflict"
 // @Failure      500  "Internal Server Error"
 // @Router       /roles/{id} [put]
-func (rc *RoleController) Update(c *fiber.Ctx) error {
+func (rc *RoleHandler) Update(c *fiber.Ctx) error {
 	c.Accepts("application/json")
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
@@ -139,7 +139,7 @@ func (rc *RoleController) Update(c *fiber.Ctx) error {
 // @Failure      404  "Not Found"
 // @Failure      500  "Internal Server Error"
 // @Router       /roles/{id} [delete]
-func (rc *RoleController) Delete(c *fiber.Ctx) error {
+func (rc *RoleHandler) Delete(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
@@ -163,7 +163,7 @@ func (rc *RoleController) Delete(c *fiber.Ctx) error {
 // @Failure      404  "Not Found"
 // @Failure      500  "Internal Server Error"
 // @Router       /roles/{id}/users [get]
-func (rc *RoleController) GetUsersOfRole(c *fiber.Ctx) error {
+func (rc *RoleHandler) GetUsersOfRole(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
@@ -188,7 +188,7 @@ func (rc *RoleController) GetUsersOfRole(c *fiber.Ctx) error {
 // @Failure      404  "Not Found"
 // @Failure      500  "Internal Server Error"
 // @Router       /roles/{roleid}/users/{userid} [put]
-func (rc *RoleController) AddUserToRole(c *fiber.Ctx) error {
+func (rc *RoleHandler) AddUserToRole(c *fiber.Ctx) error {
 	roleid, _ := c.ParamsInt("roleid", -1)
 	userid, _ := c.ParamsInt("userid", -1)
 	if roleid < 0 || userid < 0 {
@@ -214,7 +214,7 @@ func (rc *RoleController) AddUserToRole(c *fiber.Ctx) error {
 // @Failure      404  "Not Found"
 // @Failure      500  "Internal Server Error"
 // @Router       /roles/{roleid}/users/{userid} [delete]
-func (rc *RoleController) RemoveUserFromRole(c *fiber.Ctx) error {
+func (rc *RoleHandler) RemoveUserFromRole(c *fiber.Ctx) error {
 	roleid, _ := c.ParamsInt("roleid", -1)
 	userid, _ := c.ParamsInt("userid", -1)
 	if roleid < 0 || userid < 0 {

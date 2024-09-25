@@ -6,11 +6,11 @@ This service handles authentication and authorization/access control for users p
 
 ## Architecture
 The architecture is a simple layered architecture that looks like this:  
-HTTP Request/Response <-> Router <-> Controller <-> Service <-> Repository <-> Model/Database  
+HTTP Request/Response <-> Router <-> Handler <-> Service <-> Repository <-> Model/Database  
 
 In `main.go` the parts of the application are initialized using dependency injection.
 The initialization of all API routes and some middlewares is located in `router/router.go`.  
-The `router` references the handler functions located in the `controller` package.  
+The `router` references the handler functions located in the `handler` package.  
 The handler functions only handle parsing requests and call the corresponding function(s) in the `service` package to handle the request.  
 The functions in the `service` package access the SQL database using the `repository` layer. This makes it easier to later change the underlying ORM or database library.  
 The `middleware` package defines a custom middleware for authentication using session cookies.  

@@ -1,4 +1,4 @@
-package controller
+package handler
 
 import (
 	"github.com/ProjectLighthouseCAU/heimdall/model"
@@ -7,16 +7,16 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/session"
 )
 
-type UserController struct {
+type UserHandler struct {
 	userService  service.UserService
 	roleService  service.RoleService
 	sessionStore *session.Store
 }
 
-func NewUserController(userService service.UserService,
+func NewUserHandler(userService service.UserService,
 	roleService service.RoleService,
-	sessionStore *session.Store) UserController {
-	return UserController{userService, roleService, sessionStore}
+	sessionStore *session.Store) UserHandler {
+	return UserHandler{userService, roleService, sessionStore}
 }
 
 // @Summary      Get all users or query by name
@@ -30,7 +30,7 @@ func NewUserController(userService service.UserService,
 // @Failure      404  "Not Found"
 // @Failure      500  "Internal Server Error"
 // @Router       /users [get]
-func (uc *UserController) GetAll(c *fiber.Ctx) error {
+func (uc *UserHandler) GetAll(c *fiber.Ctx) error {
 	// query users by name
 	name := c.Query("name", "")
 	if name != "" {
@@ -46,7 +46,7 @@ func (uc *UserController) GetAll(c *fiber.Ctx) error {
 }
 
 // Documentation included in GetAll
-func (uc *UserController) GetByName(c *fiber.Ctx) error {
+func (uc *UserHandler) GetByName(c *fiber.Ctx) error {
 	name := c.Query("name", "")
 	if name == "" {
 		return fiber.ErrBadRequest
@@ -71,7 +71,7 @@ func (uc *UserController) GetByName(c *fiber.Ctx) error {
 // @Failure      404  "Not Found"
 // @Failure      500  "Internal Server Error"
 // @Router       /users/{id} [get]
-func (uc *UserController) GetByID(c *fiber.Ctx) error {
+func (uc *UserHandler) GetByID(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
@@ -99,7 +99,7 @@ type LoginPayload struct {
 // @Failure      401  "Unauthorized"
 // @Failure      500  "Internal Server Error"
 // @Router       /login [post]
-func (uc *UserController) Login(c *fiber.Ctx) error {
+func (uc *UserHandler) Login(c *fiber.Ctx) error {
 	c.Accepts("application/json")
 	var payload LoginPayload
 	if err := c.BodyParser(&payload); err != nil {
@@ -125,7 +125,7 @@ func (uc *UserController) Login(c *fiber.Ctx) error {
 // @Failure      401  "Unauthorized"
 // @Failure      500  "Internal Server Error"
 // @Router       /logout [post]
-func (uc *UserController) Logout(c *fiber.Ctx) error {
+func (uc *UserHandler) Logout(c *fiber.Ctx) error {
 	c.Accepts("application/json")
 	session, err := uc.sessionStore.Get(c)
 	if err != nil {
@@ -156,7 +156,7 @@ type RegisterPayload struct {
 // @Failure      409  "Conflict"
 // @Failure      500  "Internal Server Error"
 // @Router       /register [post]
-func (uc *UserController) Register(c *fiber.Ctx) error {
+func (uc *UserHandler) Register(c *fiber.Ctx) error {
 	c.Accepts("application/json")
 	var payload RegisterPayload
 	if err := c.BodyParser(&payload); err != nil {
@@ -193,7 +193,7 @@ type CreateOrUpdateUserPayload struct {
 // @Failure      409  "Conflict"
 // @Failure      500  "Internal Server Error"
 // @Router       /users [post]
-func (uc *UserController) Create(c *fiber.Ctx) error {
+func (uc *UserHandler) Create(c *fiber.Ctx) error {
 	c.Accepts("application/json")
 	var payload CreateOrUpdateUserPayload
 	if err := c.BodyParser(&payload); err != nil {
@@ -222,7 +222,7 @@ func (uc *UserController) Create(c *fiber.Ctx) error {
 // @Failure      409  "Conflict"
 // @Failure      500  "Internal Server Error"
 // @Router       /users/{id} [put]
-func (uc *UserController) Update(c *fiber.Ctx) error {
+func (uc *UserHandler) Update(c *fiber.Ctx) error {
 	c.Accepts("application/json")
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
@@ -252,7 +252,7 @@ func (uc *UserController) Update(c *fiber.Ctx) error {
 // @Failure      404  "Not Found"
 // @Failure      500  "Internal Server Error"
 // @Router       /users/{id} [delete]
-func (uc *UserController) Delete(c *fiber.Ctx) error {
+func (uc *UserHandler) Delete(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
@@ -276,7 +276,7 @@ func (uc *UserController) Delete(c *fiber.Ctx) error {
 // @Failure      404  "Not Found"
 // @Failure      500  "Internal Server Error"
 // @Router       /users/{id}/roles [get]
-func (uc *UserController) GetRolesOfUser(c *fiber.Ctx) error {
+func (uc *UserHandler) GetRolesOfUser(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)

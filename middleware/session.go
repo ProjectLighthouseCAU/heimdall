@@ -3,7 +3,7 @@ package middleware
 import (
 	"slices"
 
-	"github.com/ProjectLighthouseCAU/heimdall/controller"
+	"github.com/ProjectLighthouseCAU/heimdall/handler"
 	"github.com/ProjectLighthouseCAU/heimdall/model"
 	"github.com/ProjectLighthouseCAU/heimdall/service"
 	"github.com/gofiber/fiber/v2"
@@ -20,19 +20,19 @@ func NewSessionMiddleware(sessionStore *session.Store,
 		}
 		userIdIntf := session.Get("userid")
 		if userIdIntf == nil {
-			return controller.UnwrapAndSendError(c, model.UnauthorizedError{})
+			return handler.UnwrapAndSendError(c, model.UnauthorizedError{})
 		}
 		userId, ok := userIdIntf.(uint)
 		if !ok {
-			return controller.UnwrapAndSendError(c, model.InternalServerError{})
+			return handler.UnwrapAndSendError(c, model.InternalServerError{})
 		}
 		user, err := userService.GetByID(userId)
 		if err != nil {
 			err := session.Destroy()
 			if err != nil {
-				return controller.UnwrapAndSendError(c, model.InternalServerError{Message: "Could not destroy session", Err: err})
+				return handler.UnwrapAndSendError(c, model.InternalServerError{Message: "Could not destroy session", Err: err})
 			}
-			return controller.UnwrapAndSendError(c, model.UnauthorizedError{})
+			return handler.UnwrapAndSendError(c, model.UnauthorizedError{})
 		}
 		c.Locals("user", user)
 		tokenService.GenerateApiTokenIfNotExists(user)

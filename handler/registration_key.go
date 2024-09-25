@@ -1,4 +1,4 @@
-package controller
+package handler
 
 import (
 	"time"
@@ -7,12 +7,12 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-type RegistrationKeyController struct {
+type RegistrationKeyHandler struct {
 	registrationKeyService service.RegistrationKeyService
 }
 
-func NewRegistrationKeyController(regKeyService service.RegistrationKeyService) RegistrationKeyController {
-	return RegistrationKeyController{regKeyService}
+func NewRegistrationKeyHandler(regKeyService service.RegistrationKeyService) RegistrationKeyHandler {
+	return RegistrationKeyHandler{regKeyService}
 }
 
 // @Summary      Get all registration keys or query by key
@@ -27,7 +27,7 @@ func NewRegistrationKeyController(regKeyService service.RegistrationKeyService) 
 // @Failure      404  "Not Found"
 // @Failure      500  "Internal Server Error"
 // @Router       /registration-keys [get]
-func (rkc *RegistrationKeyController) Get(c *fiber.Ctx) error {
+func (rkc *RegistrationKeyHandler) Get(c *fiber.Ctx) error {
 	// query registration keys by key (string value)
 	keyStr := c.Query("key", "")
 	if keyStr != "" {
@@ -58,7 +58,7 @@ func (rkc *RegistrationKeyController) Get(c *fiber.Ctx) error {
 // @Failure      404  "Not Found"
 // @Failure      500  "Internal Server Error"
 // @Router       /registration-keys/{id} [get]
-func (rkc *RegistrationKeyController) GetByID(c *fiber.Ctx) error {
+func (rkc *RegistrationKeyHandler) GetByID(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
@@ -90,7 +90,7 @@ type CreateRegistrationKeyPayload struct {
 // @Failure      409  "Conflict"
 // @Failure      500  "Internal Server Error"
 // @Router       /registration-keys [post]
-func (rkc *RegistrationKeyController) Create(c *fiber.Ctx) error {
+func (rkc *RegistrationKeyHandler) Create(c *fiber.Ctx) error {
 	c.Accepts("application/json")
 	var payload CreateRegistrationKeyPayload
 	if err := c.BodyParser(&payload); err != nil {
@@ -122,7 +122,7 @@ type UpdateRegistrationKeyPayload struct {
 // @Failure      403  "Forbidden"
 // @Failure      500  "Internal Server Error"
 // @Router       /registration-keys/{id} [put]
-func (rkc *RegistrationKeyController) Update(c *fiber.Ctx) error {
+func (rkc *RegistrationKeyHandler) Update(c *fiber.Ctx) error {
 	c.Accepts("application/json")
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
@@ -151,7 +151,7 @@ func (rkc *RegistrationKeyController) Update(c *fiber.Ctx) error {
 // @Failure      404  "Not Found"
 // @Failure      500  "Internal Server Error"
 // @Router       /registration-keys/{id} [delete]
-func (rkc *RegistrationKeyController) Delete(c *fiber.Ctx) error {
+func (rkc *RegistrationKeyHandler) Delete(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
@@ -175,7 +175,7 @@ func (rkc *RegistrationKeyController) Delete(c *fiber.Ctx) error {
 // @Failure      404  "Not Found"
 // @Failure      500  "Internal Server Error"
 // @Router       /registration-keys/{id}/users [get]
-func (rkc *RegistrationKeyController) GetUsersOfKey(c *fiber.Ctx) error {
+func (rkc *RegistrationKeyHandler) GetUsersOfKey(c *fiber.Ctx) error {
 	id, _ := c.ParamsInt("id", -1)
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
