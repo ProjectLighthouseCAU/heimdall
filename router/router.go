@@ -1,15 +1,18 @@
 package router
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/ProjectLighthouseCAU/heimdall/config"
 	"github.com/ProjectLighthouseCAU/heimdall/handler"
 	"github.com/ProjectLighthouseCAU/heimdall/middleware"
+	"github.com/ProjectLighthouseCAU/heimdall/model"
 	swagger "github.com/arsmn/fiber-swagger/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/helmet"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/monitor"
@@ -27,28 +30,51 @@ type Router struct {
 }
 
 func NewRouter(app *fiber.App,
-	userContr handler.UserHandler,
-	regKeyContr handler.RegistrationKeyHandler,
-	roleContr handler.RoleHandler,
-	tokenContr handler.TokenHandler,
+	userHandler handler.UserHandler,
+	regKeyHandler handler.RegistrationKeyHandler,
+	roleHandler handler.RoleHandler,
+	tokenHandler handler.TokenHandler,
 	sessionMiddleware fiber.Handler) Router {
-	return Router{app, userContr, regKeyContr, roleContr, tokenContr, sessionMiddleware}
+	return Router{app, userHandler, regKeyHandler, roleHandler, tokenHandler, sessionMiddleware}
 }
 
 func (r *Router) Init() {
+	// log requests and responses
 	r.app.Use(logger.New())
+
+	// recover from panics in request handlers
 	r.app.Use(recover.New())
-	// app.Use(csrf.New()) // FIXME: csrf prevents everything except GET requests
+
+	// setup helmet middleware for setting HTTP security headers
+	r.app.Use(helmet.New())
+
+	// FIXME: csrf prevents everything except GET requests
+	// app.Use(csrf.New())
+
+	// setup CORS middleware
 	r.app.Use(cors.New(cors.Config{
 		AllowOrigins:     strings.Join([]string{config.GetString("API_HOST", "https://lighthouse.uni-kiel.de"), config.GetString("CORS_ALLOW_ORIGINS", "http://localhost")}, ","), // TODO: remove localhost in production
 		AllowCredentials: true,                                                                                                                                                    // TODO: remove in production
 	}))
+
+	// TODO: add healthcheck middleware for liveness and readyness endpoints
+	// r.app.Use(healthcheck.New())
+
+	// allow login and register once every 10 seconds per client
+	unauthorizedLimiter := limiter.New(limiter.Config{
+		Max:        6,
+		Expiration: 1 * time.Minute,
+	})
+	r.app.Post("/register", unauthorizedLimiter, r.userHandler.Register)
+	r.app.Post("/login", unauthorizedLimiter, r.userHandler.Login)
+
+	// allow 5 requests per second per client
 	r.app.Use(limiter.New(limiter.Config{
 		Max:        300,
 		Expiration: 1 * time.Minute,
 	}))
-	r.app.Use(pprof.New())
 
+	// setup and serve swagger API documentation
 	swag := swagger.New(swagger.Config{
 		Title:                    "Heimdall Lighthouse API",
 		URL:                      "doc.json",
@@ -68,16 +94,24 @@ func (r *Router) Init() {
 	r.app.Get("/swagger", swag)
 	r.app.Get("/swagger/*", swag)
 
-	r.app.Post("/register", r.userHandler.Register)
-	r.app.Post("/login", r.userHandler.Login)
-
+	// all requests to routes after this point have to be authenticated
 	r.app.Use(r.sessionMiddleware)
+
+	// serve fiber monitor
 	r.app.Get("/metrics", monitor.New())
+
+	// setup pprof monitoring middleware
+	r.app.Use(pprof.New(pprof.Config{Prefix: config.GetString("API_BASE_PATH", "/api")}))
 
 	r.app.Post("/logout", r.userHandler.Logout)
 	r.initUserRoutes()
 	r.initRegistrationKeyRoutes()
 	r.initRoleRoutes()
+
+	// catch all requests that could not be handled and send JSON response (instead of fibers plain text)
+	r.app.All("*", func(c *fiber.Ctx) error {
+		return handler.UnwrapAndSendError(c, model.NotFoundError{Message: fmt.Sprintf("Cannot %s %s", c.Method(), c.Path())})
+	})
 }
 
 /*
