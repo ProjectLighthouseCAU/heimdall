@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"github.com/ProjectLighthouseCAU/heimdall/model"
 	"github.com/ProjectLighthouseCAU/heimdall/service"
 	"github.com/gofiber/fiber/v2"
 )
@@ -87,7 +88,7 @@ func (rc *RoleHandler) Create(c *fiber.Ctx) error {
 	c.Accepts("application/json")
 	var payload CreateOrUpdateRolePayload
 	if err := c.BodyParser(&payload); err != nil {
-		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
+		return UnwrapAndSendError(c, model.BadRequestError{Message: "Could not parse request body", Err: err})
 	}
 	err := rc.roleService.Create(payload.Name)
 	if err != nil {
@@ -118,7 +119,7 @@ func (rc *RoleHandler) Update(c *fiber.Ctx) error {
 	}
 	var payload CreateOrUpdateRolePayload
 	if err := c.BodyParser(&payload); err != nil {
-		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
+		return UnwrapAndSendError(c, model.BadRequestError{Message: "Could not parse request body", Err: err})
 	}
 	err := rc.roleService.Update(uint(id), payload.Name)
 	if err != nil {

@@ -103,7 +103,7 @@ func (uc *UserHandler) Login(c *fiber.Ctx) error {
 	c.Accepts("application/json")
 	var payload LoginPayload
 	if err := c.BodyParser(&payload); err != nil {
-		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
+		return UnwrapAndSendError(c, model.BadRequestError{Message: "Could not parse request body", Err: err})
 	}
 	session, err := uc.sessionStore.Get(c)
 	if err != nil {
@@ -160,7 +160,7 @@ func (uc *UserHandler) Register(c *fiber.Ctx) error {
 	c.Accepts("application/json")
 	var payload RegisterPayload
 	if err := c.BodyParser(&payload); err != nil {
-		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
+		return UnwrapAndSendError(c, model.BadRequestError{Message: "Could not parse request body", Err: err})
 	}
 	session, err := uc.sessionStore.Get(c)
 	if err != nil {
@@ -197,7 +197,7 @@ func (uc *UserHandler) Create(c *fiber.Ctx) error {
 	c.Accepts("application/json")
 	var payload CreateOrUpdateUserPayload
 	if err := c.BodyParser(&payload); err != nil {
-		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
+		return UnwrapAndSendError(c, model.BadRequestError{Message: "Could not parse request body", Err: err})
 	}
 
 	err := uc.userService.Create(payload.Username, payload.Password, payload.Email, payload.PermamentAPIToken)
@@ -230,7 +230,7 @@ func (uc *UserHandler) Update(c *fiber.Ctx) error {
 	}
 	var payload CreateOrUpdateUserPayload
 	if err := c.BodyParser(&payload); err != nil {
-		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
+		return UnwrapAndSendError(c, model.BadRequestError{Message: "Could not parse request body", Err: err})
 	}
 
 	err := uc.userService.Update(uint(id), payload.Username, payload.Password, payload.Email, payload.PermamentAPIToken)

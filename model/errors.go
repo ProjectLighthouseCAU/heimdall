@@ -1,5 +1,10 @@
 package model
 
+type HTTPError interface {
+	Error() string
+	Status() int
+}
+
 // Indicates that a resource was not found
 type NotFoundError struct {
 	Message string
@@ -29,7 +34,7 @@ type BadRequestError struct {
 }
 
 func (e BadRequestError) Error() string {
-	s := "Bad Request"
+	s := "400 Bad Request"
 	if e.Message != "" {
 		s = s + ": " + e.Message
 	}
@@ -52,7 +57,7 @@ type InternalServerError struct {
 }
 
 func (e InternalServerError) Error() string {
-	s := "Internal Server Error"
+	s := "500 Internal Server Error"
 	if e.Message != "" {
 		s = s + ": " + e.Message
 	}
@@ -75,7 +80,7 @@ type ConflictError struct {
 }
 
 func (e ConflictError) Error() string {
-	s := "Conflict"
+	s := "409 Conflict"
 	if e.Message != "" {
 		s = s + ": " + e.Message
 	}
@@ -98,7 +103,7 @@ type UnauthorizedError struct {
 }
 
 func (e UnauthorizedError) Error() string {
-	s := "Unauthorized"
+	s := "401 Unauthorized"
 	if e.Message != "" {
 		s = s + ": " + e.Message
 	}
@@ -121,7 +126,7 @@ type ForbiddenError struct {
 }
 
 func (e ForbiddenError) Error() string {
-	s := "Forbidden"
+	s := "403 Forbidden"
 	if e.Message != "" {
 		s = s + ": " + e.Message
 	}

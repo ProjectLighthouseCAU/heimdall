@@ -3,6 +3,7 @@ package handler
 import (
 	"time"
 
+	"github.com/ProjectLighthouseCAU/heimdall/model"
 	"github.com/ProjectLighthouseCAU/heimdall/service"
 	"github.com/gofiber/fiber/v2"
 )
@@ -94,7 +95,7 @@ func (rkc *RegistrationKeyHandler) Create(c *fiber.Ctx) error {
 	c.Accepts("application/json")
 	var payload CreateRegistrationKeyPayload
 	if err := c.BodyParser(&payload); err != nil {
-		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
+		return UnwrapAndSendError(c, model.BadRequestError{Message: "Could not parse request body", Err: err})
 	}
 	err := rkc.registrationKeyService.Create(payload.Key, payload.Description, payload.Permanent, payload.ExpiresAt)
 	if err != nil {
@@ -130,7 +131,7 @@ func (rkc *RegistrationKeyHandler) Update(c *fiber.Ctx) error {
 	}
 	var payload UpdateRegistrationKeyPayload
 	if err := c.BodyParser(&payload); err != nil {
-		return c.Status(fiber.StatusBadRequest).SendString("Could not parse request body")
+		return UnwrapAndSendError(c, model.BadRequestError{Message: "Could not parse request body", Err: err})
 	}
 	err := rkc.registrationKeyService.Update(uint(id), payload.Description, payload.Permanent, payload.ExpiresAt)
 	if err != nil {
