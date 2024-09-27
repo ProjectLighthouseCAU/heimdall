@@ -104,7 +104,7 @@ func (s *UserService) Register(username, password, email, registrationKey string
 	key, err := s.registrationKeyRepository.FindByKey(registrationKey)
 	if err != nil {
 		switch err.(type) {
-		case *model.NotFoundError:
+		case model.NotFoundError:
 			return nil, model.UnauthorizedError{Message: "invalid registration key", Err: err}
 		}
 		return nil, err
