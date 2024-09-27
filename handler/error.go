@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/ProjectLighthouseCAU/heimdall/model"
@@ -14,8 +13,6 @@ type APIError struct {
 }
 
 func UnwrapAndSendError(c *fiber.Ctx, err error) error {
-	fmt.Println(err) // TODO: remove logging
-
 	if httpErr, ok := err.(model.HTTPError); ok {
 		return c.Status(httpErr.Status()).JSON(APIError{Status: httpErr.Status(), Error: httpErr.Error()})
 	}
