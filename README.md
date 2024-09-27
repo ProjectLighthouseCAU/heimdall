@@ -59,17 +59,24 @@ The documentation gets automatically generated from code comments and is served 
 Swagger also provides the documentation in the OpenAPI standard, so you can get the OpenAPI JSON specification from `/swagger/doc.json` and import it into the program of your choice that supports OpenAPI (e.g. Postman).
 
 ## TODO
-- important: testing (end-to-end, unit, security)
-- important: security (csrf, xss, sqli, cors, same-origin, csp)
-- important: don't return database errors, they could leak sensitive information
-- important: password criteria (sync with frontend)
-- important: don't return plain text (bad practice), always return json e.g. {"code": 404, "message": "Not found}
-- important: use transactions for redis and maybe postgres
-- maybe: remove redundant timestamp from user table (LastLogin and UpdatedAt are nearly identical, but UpdatedAt only changes because LastLogin is updated :D) -> however when an admin updates a user that hasn't logged in for a while, the field makes sense
-- find out why gorm does not load associations (joins)
-- maybe: rename every occurrence of controller to handler
-- maybe: overhaul registration key prefix and generation
-- maybe: allow user to query their own registration key and role (not important since available through the /users route)
-- ...
-- better README ;-)
+STATUS: DONE, TESTING, IN-PROGRESS, TODO, NO (decided against)
+| STATUS | priority | task |
+| -------| -------- | ---- |
+DONE | maybe | rename every occurrence of controller to handler
+DONE | important | don't return database errors, they could leak sensitive information
+DONE | important | return 401 on /register with invalid reg-key
+TESTING | important | check that the rate limiter uses the correct IP after reverse proxy
+TESTING | important | lower rate limit for routes that hash passwords to prevent easy DOS (login, register, update user, create user)
+TESTING | important | don't return plain text (bad practice), always return json e.g. {"code": 404, "message": "Not found}
+IN-PROGRESS | important | testing (end-to-end, unit, security)
+IN-PROGRESS | important | security (csrf, xss, sqli, cors, same-origin, csp)
+TODO | maybe | password criteria (sync with frontend)
+TODO | maybe | overhaul registration key prefix and generation
+TODO | important | document config options (maybe collect them in the config.go file instead of scattered around the codebase)
+TODO | important | make rate limiter configurable
+TODO | maybe | better README ;-)
+NO | important | use transactions for redis and maybe postgres
+NO | maybe | remove redundant timestamp from user table (LastLogin and UpdatedAt are nearly identical, but UpdatedAt only changes because LastLogin is updated :D) -> however when an admin updates a user that hasn't logged in for a while, the field makes sense
+NO | maybe | find out why gorm does not load associations (joins)
+NO | maybe | allow user to query their own registration key and role (not important since available through the /users route)
 
