@@ -31,6 +31,7 @@ func Setup() *fiber.App {
 		AppName:       "Heimdall",
 		CaseSensitive: true,
 		StrictRouting: true,
+		ProxyHeader:   "X-Real-Ip",
 	})
 
 	// Dependency Injection
