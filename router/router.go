@@ -64,6 +64,9 @@ func (r *Router) Init() {
 	unauthorizedLimiter := limiter.New(limiter.Config{
 		Max:        6,
 		Expiration: 1 * time.Minute,
+		Next: func(c *fiber.Ctx) bool {
+			return config.GetBool("DISABLE_RATE_LIMITER", false)
+		},
 	})
 	r.app.Post("/register", unauthorizedLimiter, r.userHandler.Register)
 	r.app.Post("/login", unauthorizedLimiter, r.userHandler.Login)
@@ -72,6 +75,9 @@ func (r *Router) Init() {
 	r.app.Use(limiter.New(limiter.Config{
 		Max:        300,
 		Expiration: 1 * time.Minute,
+		Next: func(c *fiber.Ctx) bool {
+			return config.GetBool("DISABLE_RATE_LIMITER", false)
+		},
 	}))
 
 	// setup and serve swagger API documentation
