@@ -177,8 +177,14 @@ func (s *UserService) Update(id uint, username, password, email string, permanen
 	if err != nil {
 		return err
 	}
-	if err := validateUser(username, password, email); err != nil {
-		return err
+	if !isValidName(username) {
+		return model.BadRequestError{Message: "Invalid name"}
+	}
+	if password != "" && !isValidPassword(password) {
+		return model.BadRequestError{Message: "Password does not meet criteria"}
+	}
+	if !isValidEmail(email) {
+		return model.BadRequestError{Message: "Invalid email"}
 	}
 	if username != user.Username || user.PermanentAPIToken != permanentAPIToken {
 		// renew token if username changed
@@ -190,7 +196,7 @@ func (s *UserService) Update(id uint, username, password, email string, permanen
 		}
 		// TODO: maybe keep list of previous names?
 	}
-	if !crypto.PasswordMatchesHash(password, user.Password) {
+	if password != "" && !crypto.PasswordMatchesHash(password, user.Password) {
 		hashedPassword, err := crypto.HashPassword(password)
 		if err != nil {
 			return model.InternalServerError{Message: "could not hash password", Err: err}
