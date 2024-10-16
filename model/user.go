@@ -13,6 +13,6 @@ type User struct {
 	PermanentAPIToken bool       `json:"permanent_api_token"`                  // if set the users API token never automatically expires
 
 	RegistrationKeyID *uint            `gorm:"constraint:OnDelete:SET NULL" json:"-"`
-	RegistrationKey   *RegistrationKey `gorm:"foreignkey:RegistrationKeyID" json:"registration_key,omitempty"` // omitted if null (when user was created and not registered)
-	Roles             []Role           `gorm:"many2many:user_roles;constraint:OnDelete:CASCADE;" json:"-"`     // roles of this user, not serialized
+	RegistrationKey   *RegistrationKey `gorm:"foreignkey:RegistrationKeyID" json:"registration_key,omitempty"` // omitted if null (when user was created and not registered or when list of users is queried to not leak other users keys)
+	Roles             []Role           `gorm:"many2many:user_roles;constraint:OnDelete:CASCADE;" json:"roles"`
 } //@name User

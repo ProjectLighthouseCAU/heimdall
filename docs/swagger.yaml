@@ -140,7 +140,12 @@ definitions:
       registration_key:
         allOf:
         - $ref: '#/definitions/RegistrationKey'
-        description: omitted if null (when user was created and not registered)
+        description: omitted if null (when user was created and not registered or
+          when list of users is queried to not leak other users keys)
+      roles:
+        items:
+          $ref: '#/definitions/Role'
+        type: array
       updated_at:
         description: ISO 8601 datetime
         type: string

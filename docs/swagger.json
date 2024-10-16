@@ -1305,12 +1305,18 @@
                     "type": "boolean"
                 },
                 "registration_key": {
-                    "description": "omitted if null (when user was created and not registered)",
+                    "description": "omitted if null (when user was created and not registered or when list of users is queried to not leak other users keys)",
                     "allOf": [
                         {
                             "$ref": "#/definitions/RegistrationKey"
                         }
                     ]
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Role"
+                    }
                 },
                 "updated_at": {
                     "description": "ISO 8601 datetime",

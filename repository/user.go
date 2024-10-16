@@ -22,7 +22,7 @@ func (r *UserRepository) Save(user *model.User) error {
 
 func (r *UserRepository) FindAll() ([]model.User, error) {
 	var users []model.User
-	err := r.DB.Find(&users).Order("id ASC").Error
+	err := r.DB.Preload("Roles").Find(&users).Order("id ASC").Error
 	return users, wrapError(err)
 }
 
