@@ -42,16 +42,22 @@ func setupTestDatabase(db *gorm.DB, rdb *redis.Client, store *session.Store, use
 	log.Println("		Creating test data")
 	must(registrationKeyService.Create("test_registration_key", "just for testing", true, time.Now().AddDate(0, 0, 3)))
 	must(userService.Create("Admin", "password1234", "admin@example.com", false))
+	must(userService.Create("Live", "password1234", "live@example.com", true))
 	// must(userService.Create("User", "password1234", "user@example.com", false))
 	_, err := userService.Register("User", "password1234", "user@example.com", "test_registration_key", nil)
 	must(err)
 	must(roleService.Create("admin"))
-	must(roleService.Create("test"))
+	must(roleService.Create("deploy"))
 	admin, err := userService.GetByName("Admin")
+	must(err)
+	live, err := userService.GetByName("Live")
 	must(err)
 	adminRole, err := roleService.GetByName("admin")
 	must(err)
+	deployRole, err := roleService.GetByName("deploy")
+	must(err)
 	must(roleService.AddUserToRole(adminRole.ID, admin.ID))
+	must(roleService.AddUserToRole(deployRole.ID, live.ID))
 }
 
 func must(err error) {
