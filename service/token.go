@@ -28,13 +28,15 @@ func (ts *TokenService) GetToken(user *model.User) (*model.APIToken, error) {
 		return nil, model.InternalServerError{Err: err}
 	}
 	now := time.Now()
-	res, err := ts.redis.ExpireTime(context.TODO(), user.Username).Result()
+
+	// workaround: ExpireTime should return time instead of duration, see https://github.com/redis/go-redis/issues/2657
+	res, err := ts.redis.Do(context.TODO(), "EXPIRETIME", user.Username).Int64()
 	if err != nil {
 		return nil, model.InternalServerError{Message: "Redis could not get expire time"}
 	}
-	// workaround: ExpireTime should return time instead of duration, see https://github.com/redis/go-redis/issues/2657
-	expiresAt := time.Unix(int64(res.Seconds()), 0)
-	if expiresAt.Before(now) {
+
+	expiresAt := time.Unix(int64(res), 0)
+	if res == -2 || res != -1 && expiresAt.Before(now) { // -2: key does not exist, -1: no expiration
 		return nil, model.NotFoundError{}
 	}
 	token, ok := hash["token"]
