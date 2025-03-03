@@ -1,63 +1,29 @@
 package service
 
 import (
-	"context"
-	"encoding/json"
+	"errors"
+	"log"
+	"slices"
+	"sync"
 	"time"
 
+	"github.com/ProjectLighthouseCAU/heimdall/config"
 	"github.com/ProjectLighthouseCAU/heimdall/crypto"
 	"github.com/ProjectLighthouseCAU/heimdall/model"
+	"github.com/ProjectLighthouseCAU/heimdall/repository"
 	"github.com/redis/go-redis/v9"
 )
 
 type TokenService struct {
-	redis *redis.Client
+	redis           *redis.Client
+	tokenRepository repository.TokenRepository
+
+	openAuthConnections map[string][]chan *model.AuthUpdateMessage // username -> update channel
+	lock                *sync.Mutex
 }
 
-func NewTokenService(redis *redis.Client) TokenService {
-	return TokenService{redis}
-}
-
-// Get all information about a users API token (username, token, roles, expiration)
-func (ts *TokenService) GetToken(user *model.User) (*model.APIToken, error) {
-	hash, err := ts.redis.HGetAll(context.TODO(), user.Username).Result()
-	if err != nil {
-		if err == redis.Nil {
-			return nil, model.NotFoundError{Err: err}
-		}
-		return nil, model.InternalServerError{Err: err}
-	}
-	now := time.Now()
-
-	// workaround: ExpireTime should return time instead of duration, see https://github.com/redis/go-redis/issues/2657
-	res, err := ts.redis.Do(context.TODO(), "EXPIRETIME", user.Username).Int64()
-	if err != nil {
-		return nil, model.InternalServerError{Message: "Redis could not get expire time"}
-	}
-
-	expiresAt := time.Unix(int64(res), 0)
-	if res == -2 || res != -1 && expiresAt.Before(now) { // -2: key does not exist, -1: no expiration
-		return nil, model.NotFoundError{}
-	}
-	token, ok := hash["token"]
-	if !ok {
-		return nil, model.NotFoundError{}
-	}
-	rolesJson, ok := hash["roles"]
-	if !ok {
-		return nil, model.NotFoundError{}
-	}
-	var roles []string
-	err = json.Unmarshal([]byte(rolesJson), &roles)
-	if err != nil {
-		return nil, model.InternalServerError{Message: "Error unmarshaling json roles"}
-	}
-	return &model.APIToken{
-		Username:  user.Username,
-		Token:     token,
-		Roles:     roles,
-		ExpiresAt: expiresAt,
-	}, nil
+func NewTokenService(redis *redis.Client, tokenRepository repository.TokenRepository) TokenService {
+	return TokenService{redis, tokenRepository, make(map[string][]chan *model.AuthUpdateMessage), &sync.Mutex{}}
 }
 
 func newRandomToken() (string, error) {
@@ -69,41 +35,59 @@ func newRandomToken() (string, error) {
 	return s, nil
 }
 
+func (ts *TokenService) GetToken(user *model.User) (*model.Token, error) {
+	if user.Roles == nil {
+		log.Println("user.Roles is nil")
+	}
+	if user.ApiToken == nil {
+		return nil, model.NotFoundError{
+			Message: "This user does not have a valid API token",
+			Err:     nil,
+		}
+	}
+	return user.ApiToken, nil
+}
+
 // Generates a new API token for a user if the user does not have an API token (or expired)
 // Returns true if the token was generated
 func (ts *TokenService) GenerateApiTokenIfNotExists(user *model.User) (bool, error) {
-	res, err := ts.redis.Exists(context.TODO(), user.Username).Result()
-	if err != nil {
-		return false, model.InternalServerError{Message: "Error retrieving API token from redis", Err: err}
-	}
-	if res != 0 { // exists
+	token := user.ApiToken
+	if token != nil && token.ExpiresAt.After(time.Now()) {
 		return false, nil
-	}
-	roles := make([]string, len(user.Roles))
-	for i, role := range user.Roles {
-		roles[i] = role.Name
-	}
-	rolesJson, err := json.Marshal(roles)
-	if err != nil {
-		return false, model.InternalServerError{Message: "Error marshaling roles to json", Err: err}
 	}
 	newToken, err := newRandomToken()
 	if err != nil {
 		return false, model.InternalServerError{Message: "Could not generate token", Err: err}
 	}
-	_, err = ts.redis.Pipelined(context.TODO(), func(p redis.Pipeliner) error {
-		p.HSet(context.TODO(), user.Username, "token", newToken, "roles", string(rolesJson))
-		if !user.PermanentAPIToken {
-			p.Expire(context.TODO(), user.Username, 3*24*time.Hour)
-		}
-		return nil
-	})
+	token = &model.Token{
+		Token:     newToken,
+		ExpiresAt: time.Now().Add(config.GetDuration("API_TOKEN_EXPIRATION_TIME", 3*24*time.Hour)),
+		UserID:    user.ID,
+	}
+	err = ts.tokenRepository.Save(token)
 	if err != nil {
-		err = ts.redis.Del(context.TODO(), user.Username).Err()
-		if err != nil {
-			return false, model.InternalServerError{Message: "Error storing token and roles in redis or setting expiration date and could not delete key afterwards", Err: err}
+		return false, model.InternalServerError{Message: "Error storing token", Err: err}
+	}
+
+	// notify subscribers
+	ts.lock.Lock()
+	defer ts.lock.Unlock()
+
+	chans := ts.openAuthConnections[user.Username]
+	if chans == nil {
+		return true, nil
+	}
+	var roles []string
+	for _, role := range user.Roles {
+		roles = append(roles, role.Name)
+	}
+	for _, c := range chans {
+		c <- &model.AuthUpdateMessage{
+			Username:  user.Username,
+			Token:     token.Token,
+			ExpiresAt: token.ExpiresAt,
+			Roles:     roles,
 		}
-		return false, model.InternalServerError{Message: "Error storing token and roles in redis or setting expiration date", Err: err}
 	}
 	return true, nil
 }
@@ -111,20 +95,69 @@ func (ts *TokenService) GenerateApiTokenIfNotExists(user *model.User) (bool, err
 // Invalidates API token of user if it exists (not expired)
 // and returns whether the token existed
 func (ts *TokenService) InvalidateApiTokenIfExists(user *model.User) (bool, error) {
-	existed, err := ts.redis.Del(context.TODO(), user.Username).Result()
-	if err != nil {
-		if err == redis.Nil {
-			return false, model.NotFoundError{Err: err}
-		}
-		return false, model.InternalServerError{Message: "Error deleting API token in redis", Err: err}
+	return ts.invalidateApiTokenIfExists(user, true)
+}
+
+func (ts *TokenService) invalidateApiTokenIfExists(user *model.User, notify bool) (bool, error) {
+	token := user.ApiToken
+	if token == nil {
+		return false, nil
 	}
-	return existed != 0, nil
+	err := ts.tokenRepository.DeleteByID(token.ID)
+	if err != nil {
+		return false, err
+	}
+	if !notify {
+		return true, nil
+	}
+
+	// notify subscribers
+	ts.lock.Lock()
+	defer ts.lock.Unlock()
+
+	chans := ts.openAuthConnections[user.Username]
+	if chans == nil {
+		return true, nil
+	}
+	for _, c := range chans {
+		close(c) // closed channel (and therefore closed connection) indicates invalidated token
+	}
+	return true, nil
+}
+
+// Notify that the roles of a user have changed
+// the given user must have its roles field pre-loaded from the database before calling
+func (ts *TokenService) NotifyRoleUpdate(user *model.User) error {
+	ts.lock.Lock()
+	defer ts.lock.Unlock()
+
+	chans := ts.openAuthConnections[user.Username]
+	if chans == nil {
+		return nil
+	}
+	token := user.ApiToken
+	if token == nil {
+		return model.InternalServerError{Message: "API token was nil while notifying a role change for user " + user.Username}
+	}
+	var roles []string
+	for _, role := range user.Roles {
+		roles = append(roles, role.Name)
+	}
+	for _, c := range chans {
+		c <- &model.AuthUpdateMessage{
+			Username:  user.Username,
+			Token:     token.Token,
+			ExpiresAt: token.ExpiresAt,
+			Roles:     roles,
+		}
+	}
+	return nil
 }
 
 // Invalidates and re-generates the users API token if it exists
 // Does not re-generate the token if it didn't exist before
 func (ts *TokenService) RegenerateApiToken(user *model.User) (bool, error) {
-	tokenExisted, err := ts.InvalidateApiTokenIfExists(user)
+	tokenExisted, err := ts.invalidateApiTokenIfExists(user, false) // don't notify yet
 	if err != nil {
 		return false, err
 	}
@@ -137,27 +170,47 @@ func (ts *TokenService) RegenerateApiToken(user *model.User) (bool, error) {
 	return tokenExisted, err
 }
 
-// Update the roles in redis without re-generating the token
-// Returns true if key exists and roles were updated
-func (ts *TokenService) UpdateRolesIfExists(user *model.User) (bool, error) {
-	res, err := ts.redis.Exists(context.TODO(), user.Username).Result()
-	if err != nil {
-		return false, model.InternalServerError{Message: "Error retrieving API token from redis", Err: err}
+func (ts *TokenService) SubscribeToChanges(username string) chan *model.AuthUpdateMessage {
+	c := make(chan *model.AuthUpdateMessage, 1)
+
+	ts.lock.Lock()
+	defer ts.lock.Unlock()
+
+	chans := ts.openAuthConnections[username]
+	if chans == nil {
+		ts.openAuthConnections[username] = []chan *model.AuthUpdateMessage{c}
+	} else {
+		ts.openAuthConnections[username] = append(ts.openAuthConnections[username], c)
 	}
-	if res == 0 { // does not exists
-		return false, nil
+	return c
+}
+
+func (ts *TokenService) UnsubscribeFromChanges(username string, c chan *model.AuthUpdateMessage) error {
+	if c == nil {
+		return errors.New("cannot unsubscribe from nil channel")
 	}
-	roles := make([]string, len(user.Roles))
-	for i, role := range user.Roles {
-		roles[i] = role.Name
+
+	ts.lock.Lock()
+	defer ts.lock.Unlock()
+
+	chans, ok := ts.openAuthConnections[username]
+	if !ok {
+		return errors.New("no subscription for user " + username)
 	}
-	rolesJson, err := json.Marshal(roles)
-	if err != nil {
-		return false, model.InternalServerError{Message: "Error marshaling roles to json", Err: err}
+	if !slices.Contains(chans, c) {
+		return errors.New("this channel has not subscribed to " + username)
 	}
-	err = ts.redis.HSet(context.TODO(), user.Username, "roles", string(rolesJson)).Err()
-	if err != nil {
-		return false, model.InternalServerError{Message: "Error storing roles in redis", Err: err}
+
+	// delete entire map key if this is the only subscription
+	if len(chans) <= 1 {
+		delete(ts.openAuthConnections, username)
+		return nil
 	}
-	return true, nil
+	// delete channel from slice otherwise
+	ts.openAuthConnections[username] = deleteElement(ts.openAuthConnections[username], c)
+	return nil
+}
+
+func deleteElement[S ~[]E, E comparable](s S, e E) S {
+	return slices.DeleteFunc(s, func(_e E) bool { return _e == e })
 }

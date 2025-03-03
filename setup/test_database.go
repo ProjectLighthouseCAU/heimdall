@@ -20,30 +20,21 @@ func setupTestDatabase(db *gorm.DB, rdb *redis.Client, store *session.Store, use
 	must(rdb.FlushDB(context.TODO()).Err())
 	log.Println("		Deleting tables")
 
-	var users []model.User
-	db.Find(&users)
-	for _, user := range users {
-		must(db.Unscoped().Select(clause.Associations).Delete(user).Error)
-	}
-	var roles []model.Role
-	db.Find(&roles)
-	for _, role := range roles {
-		must(db.Unscoped().Select(clause.Associations).Delete(role).Error)
-	}
-	// db.Unscoped().Select(clause.Associations).Where("true").Delete(&model.Token{})
+	must(db.Unscoped().Select(clause.Associations).Where("true").Delete(&model.User{}).Error)
+	must(db.Unscoped().Select(clause.Associations).Where("true").Delete(&model.Role{}).Error)
 	must(db.Unscoped().Select(clause.Associations).Where("true").Delete(&model.RegistrationKey{}).Error)
+	must(db.Unscoped().Select(clause.Associations).Where("true").Delete(&model.Token{}).Error)
 
 	log.Println("		Resetting auto increment sequences")
 	must(db.Exec("ALTER SEQUENCE users_id_seq RESTART WITH 1").Error)
 	must(db.Exec("ALTER SEQUENCE roles_id_seq RESTART WITH 1").Error)
-	// db.Exec("ALTER SEQUENCE tokens_id_seq RESTART WITH 1")
 	must(db.Exec("ALTER SEQUENCE registration_keys_id_seq RESTART WITH 1").Error)
+	must(db.Exec("ALTER SEQUENCE tokens_id_seq RESTART WITH 1").Error)
 
 	log.Println("		Creating test data")
 	must(registrationKeyService.Create("test_registration_key", "just for testing", true, time.Now().AddDate(0, 0, 3)))
 	must(userService.Create("Admin", "password1234", "admin@example.com", false))
 	must(userService.Create("Live", "password1234", "live@example.com", true))
-	// must(userService.Create("User", "password1234", "user@example.com", false))
 	_, err := userService.Register("User", "password1234", "user@example.com", "test_registration_key", nil)
 	must(err)
 	must(roleService.Create("admin"))

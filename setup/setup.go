@@ -39,13 +39,9 @@ func Setup() *fiber.App {
 	// databases
 	log.Println("	Connecting to database")
 	db, err := connectPostgres()
-	if err != nil {
-		log.Println(err)
-	}
+	panicOnError(err)
 	redisdb, err := connectRedis(0) // use db 0 for api tokens and roles
-	if err != nil {
-		log.Println(err)
-	}
+	panicOnError(err)
 
 	// session store
 	storage := fiberRedis.New(fiberRedis.Config{
@@ -79,14 +75,16 @@ func setupApplication(app *fiber.App, db *gorm.DB, redisdb *redis.Client, store 
 	userRepository := repository.NewUserRepository(db)
 	registrationKeyRepository := repository.NewRegistrationKeyRepository(db)
 	roleRepository := repository.NewRoleRepository(db)
+	tokenRepository := repository.NewTokenRepository(db)
 
 	// migrate database
-	userRepository.Migrate()
-	registrationKeyRepository.Migrate()
-	roleRepository.Migrate()
+	panicOnError(userRepository.Migrate())
+	panicOnError(registrationKeyRepository.Migrate())
+	panicOnError(roleRepository.Migrate())
+	panicOnError(tokenRepository.Migrate())
 
 	// services
-	tokenService := service.NewTokenService(redisdb)
+	tokenService := service.NewTokenService(redisdb, tokenRepository)
 	userService := service.NewUserService(
 		userRepository,
 		registrationKeyRepository,
@@ -135,12 +133,19 @@ func setupApplication(app *fiber.App, db *gorm.DB, redisdb *redis.Client, store 
 	routa.Init()
 	printRoutes(routa.ListRoutes())
 
-	if config.GetBool("USE_TEST_DATABASE", false) {
+	if config.GetBool("USE_TEST_DATABASE", false) { // TODO: remove in prod - this function deletes the whole database
 		setupTestDatabase(db, redisdb, store, userService, roleService, registrationKeyService)
 	}
 }
 
+func panicOnError(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
 func printRoutes(routes map[string][]string) {
+	log.Println("Routes:")
 	max := 0
 	for k := range routes {
 		if len(k) > max {

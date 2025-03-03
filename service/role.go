@@ -84,12 +84,16 @@ func (r *RoleService) Update(id uint, rolename string) error {
 	// get users of role for token update
 	users, err := r.GetUsersOfRole(id)
 	if err != nil {
-		return model.InternalServerError{Message: "Could not get users of role for invalidating tokens", Err: err}
+		return model.InternalServerError{Message: "Could not get users of role", Err: err}
 	}
 
-	// update roles in redis
+	// notify token service about update
 	for _, user := range users {
-		r.tokenService.UpdateRolesIfExists(&user)
+		u, err := r.userRepository.FindByID(user.ID) // ensure roles are loaded
+		if err != nil {
+			continue
+		}
+		r.tokenService.NotifyRoleUpdate(u)
 	}
 	return nil
 }
@@ -98,7 +102,7 @@ func (r *RoleService) DeleteByID(id uint) error {
 	// get users of role before deletion
 	users, err := r.GetUsersOfRole(id)
 	if err != nil {
-		return model.InternalServerError{Message: "Could not get users of role for invalidating tokens", Err: err}
+		return model.InternalServerError{Message: "Could not get users of role", Err: err}
 	}
 
 	// delete role
@@ -107,14 +111,14 @@ func (r *RoleService) DeleteByID(id uint) error {
 		return err
 	}
 
-	// query the users of the deleted role and update the roles in redis
+	// query the users of the deleted role and notify token service about update
 	for _, user := range users {
 		updatedUser, err := r.userRepository.FindByID(user.ID)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		r.tokenService.UpdateRolesIfExists(updatedUser)
+		r.tokenService.NotifyRoleUpdate(updatedUser)
 	}
 	return nil
 }
@@ -149,9 +153,8 @@ func (r *RoleService) AddUserToRole(roleid, userid uint) error {
 	if err != nil {
 		return err
 	}
-	// update roles in redis
-	_, err = r.tokenService.UpdateRolesIfExists(user)
-	return err
+	// notify token service about update
+	return r.tokenService.NotifyRoleUpdate(user)
 }
 
 func (r *RoleService) RemoveUserFromRole(roleid, userid uint) error {
@@ -172,7 +175,6 @@ func (r *RoleService) RemoveUserFromRole(roleid, userid uint) error {
 	if err != nil {
 		return err
 	}
-	// update roles in redis
-	_, err = r.tokenService.UpdateRolesIfExists(user)
-	return err
+	// notify token service about update
+	return r.tokenService.NotifyRoleUpdate(user)
 }

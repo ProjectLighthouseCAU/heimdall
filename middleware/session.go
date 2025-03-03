@@ -10,9 +10,11 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/session"
 )
 
+type SessionMiddleware fiber.Handler
+
 func NewSessionMiddleware(sessionStore *session.Store,
 	userService service.UserService,
-	tokenService service.TokenService) fiber.Handler {
+	tokenService service.TokenService) SessionMiddleware {
 	return func(c *fiber.Ctx) error {
 		session, err := sessionStore.Get(c)
 		if err != nil {
@@ -35,12 +37,12 @@ func NewSessionMiddleware(sessionStore *session.Store,
 			return handler.UnwrapAndSendError(c, model.UnauthorizedError{})
 		}
 		c.Locals("user", user)
-		tokenService.GenerateApiTokenIfNotExists(user)
+		tokenService.GenerateApiTokenIfNotExists(user) // TODO: maybe only on login and register?
 		return c.Next()
 	}
 }
 
-func AllowRole(role string) fiber.Handler {
+func (s *SessionMiddleware) AllowRole(role string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		user, ok := c.Locals("user").(*model.User)
 		if !ok {
@@ -55,7 +57,7 @@ func AllowRole(role string) fiber.Handler {
 	}
 }
 
-func AllowOwnUserId(pathParamUserId string) fiber.Handler {
+func (s *SessionMiddleware) AllowOwnUserId(pathParamUserId string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		id, err := c.ParamsInt(pathParamUserId)
 		if err != nil {
@@ -72,7 +74,7 @@ func AllowOwnUserId(pathParamUserId string) fiber.Handler {
 	}
 }
 
-func AllowRoleOrOwnUserId(role, pathParamUserId string) fiber.Handler {
+func (s *SessionMiddleware) AllowRoleOrOwnUserId(role, pathParamUserId string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		user, ok := c.Locals("user").(*model.User)
 		if !ok {

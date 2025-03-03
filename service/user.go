@@ -65,7 +65,17 @@ func (s *UserService) Login(username, password string, session *session.Session)
 	if err != nil {
 		return nil, model.InternalServerError{Message: "Could not save user", Err: err}
 	}
-	s.tokenService.GenerateApiTokenIfNotExists(user)
+	tokenWasGenerated, err := s.tokenService.GenerateApiTokenIfNotExists(user)
+	if err != nil {
+		return nil, err
+	}
+	if tokenWasGenerated { // query user again to include generated api token
+		user, err := s.userRepository.FindByID(user.ID)
+		if err != nil {
+			return nil, model.NotFoundError{Message: "Could not find user after login - this should not happen", Err: err}
+		}
+		return user, nil
+	}
 	return user, nil
 }
 
@@ -126,11 +136,11 @@ func (s *UserService) Register(username, password, email, registrationKey string
 	}
 	now := time.Now()
 	user := model.User{
-		Username:          username,
-		Password:          string(hashedPassword),
-		Email:             email,
-		LastLogin:         &now,
-		RegistrationKeyID: &key.ID,
+		Username:        username,
+		Password:        string(hashedPassword),
+		Email:           email,
+		LastLogin:       &now,
+		RegistrationKey: key,
 	}
 	err = s.userRepository.Save(&user)
 	if err != nil {
@@ -214,12 +224,13 @@ func (s *UserService) Update(id uint, username, password, email string, permanen
 	return nil
 }
 
-func (s *UserService) DeleteByID(id uint) error {
+func (s *UserService) DeleteByID(id uint, session *session.Session) error {
 	// invalidate token
 	user, err := s.userRepository.FindByID(id)
 	if err != nil {
 		return model.NotFoundError{Err: err}
 	}
+	session.Destroy()
 	s.tokenService.InvalidateApiTokenIfExists(user)
 	return s.userRepository.DeleteByID(id)
 }
