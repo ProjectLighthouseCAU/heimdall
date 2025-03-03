@@ -186,14 +186,13 @@ func (s *UserService) Update(id uint, username, password, email string, permanen
 	if !isValidEmail(email) {
 		return model.BadRequestError{Message: "Invalid email"}
 	}
+	regenerateApiTokenAfterUpdate := false
+	var previousUser model.User
 	if username != user.Username || user.PermanentAPIToken != permanentAPIToken {
-		// renew token if username changed
-		existed, _ := s.tokenService.InvalidateApiTokenIfExists(user)
+		regenerateApiTokenAfterUpdate = true
+		previousUser = *user // copy user before update
 		user.Username = username
 		user.PermanentAPIToken = permanentAPIToken
-		if existed {
-			_, _ = s.tokenService.GenerateApiTokenIfNotExists(user)
-		}
 		// TODO: maybe keep list of previous names?
 	}
 	if password != "" && !crypto.PasswordMatchesHash(password, user.Password) {
@@ -204,7 +203,15 @@ func (s *UserService) Update(id uint, username, password, email string, permanen
 		user.Password = string(hashedPassword)
 	}
 	user.Email = email
-	return s.userRepository.Save(user)
+	err = s.userRepository.Save(user)
+	if err != nil {
+		return err
+	}
+	if regenerateApiTokenAfterUpdate {
+		_, _ = s.tokenService.InvalidateApiTokenIfExists(&previousUser)
+		_, _ = s.tokenService.GenerateApiTokenIfNotExists(user)
+	}
+	return nil
 }
 
 func (s *UserService) DeleteByID(id uint) error {
