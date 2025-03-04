@@ -257,11 +257,7 @@ func (uc *UserHandler) Delete(c *fiber.Ctx) error {
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
-	session, err := uc.sessionStore.Get(c)
-	if err != nil {
-		return UnwrapAndSendError(c, model.InternalServerError{Message: "Could not get session", Err: err})
-	}
-	err = uc.userService.DeleteByID(uint(id), session)
+	err := uc.userService.DeleteByID(uint(id))
 	if err != nil {
 		return UnwrapAndSendError(c, err)
 	}

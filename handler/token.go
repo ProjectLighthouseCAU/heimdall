@@ -3,8 +3,10 @@ package handler
 import (
 	"bufio"
 	"encoding/json"
-	"log"
+	"net"
+	"time"
 
+	"github.com/ProjectLighthouseCAU/heimdall/model"
 	"github.com/ProjectLighthouseCAU/heimdall/service"
 	"github.com/gofiber/fiber/v2"
 	"github.com/valyala/fasthttp"
@@ -41,12 +43,7 @@ func (tc *TokenHandler) Get(c *fiber.Ctx) error {
 	if err != nil {
 		return UnwrapAndSendError(c, err)
 	}
-	// TODO: maybe remove?
-	token, err := tc.tokenService.GetToken(user)
-	if err != nil {
-		return UnwrapAndSendError(c, err)
-	}
-	return c.JSON(token)
+	return c.JSON(user.ApiToken)
 }
 
 // @Summary      Renew a user's API token
@@ -70,11 +67,15 @@ func (tc *TokenHandler) Delete(c *fiber.Ctx) error {
 	if err != nil {
 		return UnwrapAndSendError(c, err)
 	}
-	_, err = tc.tokenService.RegenerateApiToken(user)
-	if err != nil {
+	if err = tc.tokenService.RegenerateApiToken(user); err != nil {
 		return UnwrapAndSendError(c, err)
 	}
 	return c.SendStatus(fiber.StatusOK)
+}
+
+type AuthRequest struct {
+	Username string `json:"username"`
+	Token    string `json:"api_token"`
 }
 
 // @Summary      Get and subscribe to updates of a user's api token and roles
@@ -87,50 +88,104 @@ func (tc *TokenHandler) Delete(c *fiber.Ctx) error {
 // @Failure      403  "Forbidden"
 // @Failure      404  "Not Found"
 // @Failure      500  "Internal Server Error"
-// @Router       /authenticate [get]
+// @Router       /internal/authenticate [get]
 // TODO: think about path
 func (tc *TokenHandler) WatchAuthChanges(c *fiber.Ctx) error {
+	// TODO: move to middleware
+	// log.Println(c.IP())
+	clientIp := net.ParseIP(c.IP())
+	// log.Println("Client IP:", clientIp)
+
+	if !(clientIp.IsPrivate() || clientIp.IsLoopback()) {
+		return c.SendStatus(fiber.StatusUnauthorized)
+	}
+
 	c.Set("Content-Type", "text/event-stream")
 	c.Set("Cache-Control", "no-cache")
 	c.Set("Connection", "keep-alive")
 	c.Set("Transfer-Encoding", "chunked")
 
-	username := c.Query("username", "")
-	if username == "" {
+	var request AuthRequest
+	if err := c.BodyParser(&request); err != nil {
+		return UnwrapAndSendError(c, model.BadRequestError{Message: "Could not parse request body", Err: err})
+	}
+
+	if request.Username == "" {
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
-	token := c.Query("token", "")
-	if token == "" {
+
+	if request.Token == "" {
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
-	user, err := tc.userService.GetByName(username)
-	if err != nil || token != user.ApiToken.Token {
+	user, err := tc.userService.GetByName(request.Username)
+	// user not found, has no token, tokens do not match or token is expired
+	if err != nil || user.ApiToken == nil || request.Token != user.ApiToken.Token || time.Now().After(user.ApiToken.ExpiresAt) {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
-	ch := tc.tokenService.SubscribeToChanges(user.Username)
+	// prepare first response:
+	var roles []string
+	for _, role := range user.Roles {
+		roles = append(roles, role.Name)
+	}
+	resp := model.AuthUpdateMessage{
+		Username:        user.Username,
+		Token:           user.ApiToken.Token,
+		ExpiresAt:       user.ApiToken.ExpiresAt,
+		Roles:           roles,
+		UsernameInvalid: false,
+	}
 
 	c.Status(fiber.StatusOK).Context().SetBodyStreamWriter(fasthttp.StreamWriter(func(w *bufio.Writer) {
-		for m := range ch {
-			json, err := json.Marshal(m)
-			if err != nil {
-				log.Println(err)
-				tc.tokenService.UnsubscribeFromChanges(user.Username, ch)
-				return
-			}
-			n, err := w.Write(json)
-			if err != nil || n != len(json) {
-				log.Println(err)
-				tc.tokenService.UnsubscribeFromChanges(user.Username, ch)
-				return
-			}
-			err = w.Flush()
-			if err != nil {
-				log.Println("Connection closed:", err)
-				tc.tokenService.UnsubscribeFromChanges(user.Username, ch)
-				return
+		// send first response
+		writeAndFlushJson(w, resp)
+
+		// subscribe to changes for this user (and unsubscribe on return)
+		ch := tc.tokenService.SubscribeToChanges(user.Username)
+		defer tc.tokenService.UnsubscribeFromChanges(user.Username, ch)
+		for {
+			select {
+			case m, ok := <-ch:
+				if !ok {
+					// log.Println("channel closed, disconnecting client")
+					return
+				}
+				err := writeAndFlushJson(w, m) // send update
+				if err != nil {
+					// log.Println(err)
+					return
+				}
+			case <-time.After(time.Second): // detect closed connection
+				err := writeAndFlushBytes(w, []byte{'\r', '\n'}) // send keepalive message (just newline without content)
+				if err != nil {
+					// log.Println(err)
+					return
+				}
 			}
 		}
 	}))
+
+	// log.Println("End of WatchAuthChanges")
+	return nil
+}
+
+func writeAndFlushJson(w *bufio.Writer, value any) error {
+	respJson, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	respJson = append(respJson, '\r', '\n')
+	return writeAndFlushBytes(w, respJson)
+}
+
+func writeAndFlushBytes(w *bufio.Writer, bs []byte) error {
+	n, err := w.Write(bs)
+	if err != nil || n != len(bs) {
+		return err
+	}
+	err = w.Flush()
+	if err != nil {
+		return err
+	}
 	return nil
 }

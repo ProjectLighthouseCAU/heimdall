@@ -157,7 +157,10 @@ func (s *UserService) Register(username, password, email, registrationKey string
 			return nil, model.InternalServerError{Message: "could not save session", Err: err}
 		}
 	}
-	s.tokenService.GenerateApiTokenIfNotExists(savedUser)
+	_, err = s.tokenService.GenerateApiTokenIfNotExists(savedUser)
+	if err != nil {
+		return nil, err
+	}
 	return savedUser, nil
 }
 
@@ -197,7 +200,7 @@ func (s *UserService) Update(id uint, username, password, email string, permanen
 		return model.BadRequestError{Message: "Invalid email"}
 	}
 	regenerateApiTokenAfterUpdate := false
-	var previousUser model.User
+	previousUser := *user
 	if username != user.Username || user.PermanentAPIToken != permanentAPIToken {
 		regenerateApiTokenAfterUpdate = true
 		previousUser = *user // copy user before update
@@ -210,6 +213,7 @@ func (s *UserService) Update(id uint, username, password, email string, permanen
 		if err != nil {
 			return model.InternalServerError{Message: "could not hash password", Err: err}
 		}
+		regenerateApiTokenAfterUpdate = true
 		user.Password = string(hashedPassword)
 	}
 	user.Email = email
@@ -218,20 +222,22 @@ func (s *UserService) Update(id uint, username, password, email string, permanen
 		return err
 	}
 	if regenerateApiTokenAfterUpdate {
-		_, _ = s.tokenService.InvalidateApiTokenIfExists(&previousUser)
+		s.tokenService.NotifyUsernameInvalid(&previousUser)
 		_, _ = s.tokenService.GenerateApiTokenIfNotExists(user)
+		// TODO: destroy all (other) sessions of the user
 	}
 	return nil
 }
 
-func (s *UserService) DeleteByID(id uint, session *session.Session) error {
+func (s *UserService) DeleteByID(id uint) error {
 	// invalidate token
 	user, err := s.userRepository.FindByID(id)
 	if err != nil {
 		return model.NotFoundError{Err: err}
 	}
-	session.Destroy()
-	s.tokenService.InvalidateApiTokenIfExists(user)
+
+	// session.Destroy() // TODO: destroy all sessions of the deleted user, not this one!
+	s.tokenService.NotifyUsernameInvalid(user)
 	return s.userRepository.DeleteByID(id)
 }
 

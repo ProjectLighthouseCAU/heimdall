@@ -125,7 +125,7 @@ func (r *Router) Init() {
 	r.app.Get("/swagger", swag)
 	r.app.Get("/swagger/*", swag)
 
-	r.app.Get("/authenticate", r.tokenHandler.WatchAuthChanges) // this endpoint authenticates requests by API token itself
+	r.app.Post("/internal/authenticate", r.tokenHandler.WatchAuthChanges) // this endpoint authenticates requests by API token itself
 
 	// all requests to routes after this point have to be authenticated
 	r.app.Use((fiber.Handler)(r.sessionMiddleware))

@@ -11,19 +11,24 @@ import (
 	"github.com/ProjectLighthouseCAU/heimdall/crypto"
 	"github.com/ProjectLighthouseCAU/heimdall/model"
 	"github.com/ProjectLighthouseCAU/heimdall/repository"
-	"github.com/redis/go-redis/v9"
 )
 
+// TODO: implement permanent API tokens!
+// TODO: notify Beacon about username changed and user deleted (DONE)
+// DON'T: let Beacon delete resources based on the AuthUpdateMessages alone - Beacon is not always subscribed to every user's AuthUpdates
+// TODO: let Beacon delete resource when username_invalid is true
+// TODO: add endpoint for Beacon to query the list of usernames (for creating and deleting resources / user directories)
+
 type TokenService struct {
-	redis           *redis.Client
 	tokenRepository repository.TokenRepository
+	userRepository  repository.UserRepository
 
 	openAuthConnections map[string][]chan *model.AuthUpdateMessage // username -> update channel
 	lock                *sync.Mutex
 }
 
-func NewTokenService(redis *redis.Client, tokenRepository repository.TokenRepository) TokenService {
-	return TokenService{redis, tokenRepository, make(map[string][]chan *model.AuthUpdateMessage), &sync.Mutex{}}
+func NewTokenService(tokenRepository repository.TokenRepository, userRepository repository.UserRepository) TokenService {
+	return TokenService{tokenRepository, userRepository, make(map[string][]chan *model.AuthUpdateMessage), &sync.Mutex{}}
 }
 
 func newRandomToken() (string, error) {
@@ -35,20 +40,8 @@ func newRandomToken() (string, error) {
 	return s, nil
 }
 
-func (ts *TokenService) GetToken(user *model.User) (*model.Token, error) {
-	if user.Roles == nil {
-		log.Println("user.Roles is nil")
-	}
-	if user.ApiToken == nil {
-		return nil, model.NotFoundError{
-			Message: "This user does not have a valid API token",
-			Err:     nil,
-		}
-	}
-	return user.ApiToken, nil
-}
-
 // Generates a new API token for a user if the user does not have an API token (or expired)
+// the given user must have its roles and api token field pre-loaded from the database before calling
 // Returns true if the token was generated
 func (ts *TokenService) GenerateApiTokenIfNotExists(user *model.User) (bool, error) {
 	token := user.ApiToken
@@ -83,32 +76,23 @@ func (ts *TokenService) GenerateApiTokenIfNotExists(user *model.User) (bool, err
 	}
 	for _, c := range chans {
 		c <- &model.AuthUpdateMessage{
-			Username:  user.Username,
-			Token:     token.Token,
-			ExpiresAt: token.ExpiresAt,
-			Roles:     roles,
+			Username:        user.Username,
+			Token:           token.Token,
+			ExpiresAt:       token.ExpiresAt,
+			Roles:           roles,
+			UsernameInvalid: false,
 		}
 	}
 	return true, nil
 }
 
-// Invalidates API token of user if it exists (not expired)
-// and returns whether the token existed
-func (ts *TokenService) InvalidateApiTokenIfExists(user *model.User) (bool, error) {
-	return ts.invalidateApiTokenIfExists(user, true)
-}
-
-func (ts *TokenService) invalidateApiTokenIfExists(user *model.User, notify bool) (bool, error) {
+func (ts *TokenService) NotifyUsernameInvalid(user *model.User) {
 	token := user.ApiToken
-	if token == nil {
-		return false, nil
-	}
-	err := ts.tokenRepository.DeleteByID(token.ID)
-	if err != nil {
-		return false, err
-	}
-	if !notify {
-		return true, nil
+	if token != nil {
+		err := ts.tokenRepository.DeleteByID(token.ID)
+		if err != nil {
+			log.Println("NotifyUsernameInvalid: could not delete token with id", token.ID, ":", err)
+		}
 	}
 
 	// notify subscribers
@@ -117,16 +101,22 @@ func (ts *TokenService) invalidateApiTokenIfExists(user *model.User, notify bool
 
 	chans := ts.openAuthConnections[user.Username]
 	if chans == nil {
-		return true, nil
+		return
 	}
 	for _, c := range chans {
+		c <- &model.AuthUpdateMessage{ // TODO: maybe not needed? close of channel (and connection) signals that auth data is invalid -> ensure connection closes!
+			Username:        user.Username,
+			Token:           "",
+			ExpiresAt:       time.Now(),
+			Roles:           []string{},
+			UsernameInvalid: true,
+		}
 		close(c) // closed channel (and therefore closed connection) indicates invalidated token
 	}
-	return true, nil
 }
 
 // Notify that the roles of a user have changed
-// the given user must have its roles field pre-loaded from the database before calling
+// the given user must have its roles and api token field pre-loaded from the database before calling
 func (ts *TokenService) NotifyRoleUpdate(user *model.User) error {
 	ts.lock.Lock()
 	defer ts.lock.Unlock()
@@ -145,29 +135,27 @@ func (ts *TokenService) NotifyRoleUpdate(user *model.User) error {
 	}
 	for _, c := range chans {
 		c <- &model.AuthUpdateMessage{
-			Username:  user.Username,
-			Token:     token.Token,
-			ExpiresAt: token.ExpiresAt,
-			Roles:     roles,
+			Username:        user.Username,
+			Token:           token.Token,
+			ExpiresAt:       token.ExpiresAt,
+			Roles:           roles,
+			UsernameInvalid: false,
 		}
 	}
 	return nil
 }
 
-// Invalidates and re-generates the users API token if it exists
-// Does not re-generate the token if it didn't exist before
-func (ts *TokenService) RegenerateApiToken(user *model.User) (bool, error) {
-	tokenExisted, err := ts.invalidateApiTokenIfExists(user, false) // don't notify yet
+// Invalidates an existing API token of a user and re-generates a new one
+func (ts *TokenService) RegenerateApiToken(user *model.User) error {
+	user.ApiToken = nil // forces re-generation
+	generated, err := ts.GenerateApiTokenIfNotExists(user)
 	if err != nil {
-		return false, err
+		return err
 	}
-	if tokenExisted {
-		_, err := ts.GenerateApiTokenIfNotExists(user)
-		if err != nil {
-			return true, err
-		}
+	if !generated {
+		return model.InternalServerError{Message: "API Token could not be regenerated!"}
 	}
-	return tokenExisted, err
+	return nil
 }
 
 func (ts *TokenService) SubscribeToChanges(username string) chan *model.AuthUpdateMessage {
@@ -182,6 +170,7 @@ func (ts *TokenService) SubscribeToChanges(username string) chan *model.AuthUpda
 	} else {
 		ts.openAuthConnections[username] = append(ts.openAuthConnections[username], c)
 	}
+	log.Println("Subscribed to", username)
 	return c
 }
 
@@ -200,7 +189,7 @@ func (ts *TokenService) UnsubscribeFromChanges(username string, c chan *model.Au
 	if !slices.Contains(chans, c) {
 		return errors.New("this channel has not subscribed to " + username)
 	}
-
+	log.Println("Unsubscribed from", username)
 	// delete entire map key if this is the only subscription
 	if len(chans) <= 1 {
 		delete(ts.openAuthConnections, username)

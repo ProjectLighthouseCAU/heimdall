@@ -12,8 +12,9 @@ type Token struct {
 
 // @Description Message that is sent to notify subscribers (e.g. Beacon) on changes to one of these authentication related values
 type AuthUpdateMessage struct {
-	Username  string    `json:"username"`   // unique username associated with this token
-	Token     string    `json:"api_token"`  // the actual API token
-	ExpiresAt time.Time `json:"expires_at"` // expiration date of this token
-	Roles     []string  `json:"roles"`      // roles associated with this token
+	Username        string    `json:"username"`         // unique username associated with this token
+	Token           string    `json:"api_token"`        // the actual API token
+	ExpiresAt       time.Time `json:"expires_at"`       // expiration date of this token
+	Roles           []string  `json:"roles"`            // roles associated with this token
+	UsernameInvalid bool      `json:"username_invalid"` // true, if user was deleted or changed its username
 } //@name AuthUpdateMessage

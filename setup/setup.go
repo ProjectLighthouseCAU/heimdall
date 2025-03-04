@@ -31,7 +31,7 @@ func Setup() *fiber.App {
 		AppName:       "Heimdall",
 		CaseSensitive: true,
 		StrictRouting: true,
-		ProxyHeader:   "X-Real-Ip",
+		ProxyHeader:   config.GetString("PROXY_HEADER", "X-Real-Ip"),
 	})
 
 	// Dependency Injection
@@ -84,7 +84,7 @@ func setupApplication(app *fiber.App, db *gorm.DB, redisdb *redis.Client, store 
 	panicOnError(tokenRepository.Migrate())
 
 	// services
-	tokenService := service.NewTokenService(redisdb, tokenRepository)
+	tokenService := service.NewTokenService(tokenRepository, userRepository)
 	userService := service.NewUserService(
 		userRepository,
 		registrationKeyRepository,
