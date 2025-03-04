@@ -17,8 +17,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/session"
 	"github.com/gofiber/fiber/v2/utils"
-	fiberRedis "github.com/gofiber/storage/redis"
-	"github.com/redis/go-redis/v9"
+	"github.com/gofiber/storage/redis"
 	"gorm.io/gorm"
 )
 
@@ -36,20 +35,18 @@ func Setup() *fiber.App {
 
 	// Dependency Injection
 
-	// databases
+	// database
 	log.Println("	Connecting to database")
 	db, err := connectPostgres()
 	panicOnError(err)
-	redisdb, err := connectRedis(0) // use db 0 for api tokens and roles
-	panicOnError(err)
 
 	// session store
-	storage := fiberRedis.New(fiberRedis.Config{
+	storage := redis.New(redis.Config{
 		Host:      config.RedisHost,
 		Port:      config.RedisPort,
 		Username:  config.RedisUser,
 		Password:  config.RedisPassword,
-		Database:  1, // use db 1 for sessions
+		Database:  0,
 		Reset:     false,
 		TLSConfig: nil,
 		PoolSize:  10 * runtime.GOMAXPROCS(0),
@@ -65,12 +62,12 @@ func Setup() *fiber.App {
 		CookieHTTPOnly: false,  // TODO: change to true in production
 	})
 
-	setupApplication(app, db, redisdb, store)
+	setupApplication(app, db, store)
 
 	return app
 }
 
-func setupApplication(app *fiber.App, db *gorm.DB, redisdb *redis.Client, store *session.Store) {
+func setupApplication(app *fiber.App, db *gorm.DB, store *session.Store) {
 	// repositories
 	userRepository := repository.NewUserRepository(db)
 	registrationKeyRepository := repository.NewRegistrationKeyRepository(db)
@@ -134,7 +131,7 @@ func setupApplication(app *fiber.App, db *gorm.DB, redisdb *redis.Client, store 
 	printRoutes(routa.ListRoutes())
 
 	if config.UseTestDatabase { // TODO: remove in prod - this function deletes the whole database
-		setupTestDatabase(db, redisdb, store, userService, roleService, registrationKeyService)
+		setupTestDatabase(db, store, userService, roleService, registrationKeyService)
 	}
 }
 

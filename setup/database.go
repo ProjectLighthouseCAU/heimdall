@@ -1,13 +1,11 @@
 package setup
 
 import (
-	"context"
 	"fmt"
 	"time"
 
 	"github.com/ProjectLighthouseCAU/heimdall/config"
 	"github.com/ProjectLighthouseCAU/heimdall/model"
-	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -42,17 +40,4 @@ func connectPostgres() (*gorm.DB, error) {
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	return db, nil
-}
-
-func connectRedis(dbNumber int) (*redis.Client, error) {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", config.RedisHost, config.RedisPort),
-		Username: config.RedisUser,
-		Password: config.RedisPassword,
-		DB:       dbNumber,
-	})
-	if err := rdb.Ping(context.TODO()).Err(); err != nil {
-		return nil, model.InternalServerError{Message: "Failed to connect to redis", Err: err}
-	}
-	return rdb, nil
 }

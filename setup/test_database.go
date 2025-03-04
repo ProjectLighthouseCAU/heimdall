@@ -1,23 +1,20 @@
 package setup
 
 import (
-	"context"
 	"log"
 	"time"
 
 	"github.com/ProjectLighthouseCAU/heimdall/model"
 	"github.com/ProjectLighthouseCAU/heimdall/service"
 	"github.com/gofiber/fiber/v2/middleware/session"
-	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
-func setupTestDatabase(db *gorm.DB, rdb *redis.Client, store *session.Store, userService service.UserService, roleService service.RoleService, registrationKeyService service.RegistrationKeyService) {
+func setupTestDatabase(db *gorm.DB, store *session.Store, userService service.UserService, roleService service.RoleService, registrationKeyService service.RegistrationKeyService) {
 	log.Println("	Setting up test database")
 	log.Println("		Deleting redis")
 	must(store.Storage.Reset())
-	must(rdb.FlushDB(context.TODO()).Err())
 	log.Println("		Deleting tables")
 
 	must(db.Unscoped().Select(clause.Associations).Where("true").Delete(&model.User{}).Error)
