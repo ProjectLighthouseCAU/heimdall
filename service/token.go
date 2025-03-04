@@ -54,7 +54,7 @@ func (ts *TokenService) GenerateApiTokenIfNotExists(user *model.User) (bool, err
 	}
 	token = &model.Token{
 		Token:     newToken,
-		ExpiresAt: time.Now().Add(config.GetDuration("API_TOKEN_EXPIRATION_TIME", 3*24*time.Hour)),
+		ExpiresAt: time.Now().Add(config.ApiTokenExpirationTime),
 		UserID:    user.ID,
 	}
 	err = ts.tokenRepository.Save(token)

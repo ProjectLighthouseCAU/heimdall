@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	admin = config.GetString("ADMIN_ROLENAME", "admin")
+	admin = config.AdminRoleName
 )
 
 type Router struct {
@@ -78,8 +78,8 @@ func (r *Router) Init() {
 
 	// setup CORS middleware
 	r.app.Use(cors.New(cors.Config{
-		AllowOrigins:     strings.Join([]string{config.GetString("API_HOST", "https://lighthouse.uni-kiel.de"), config.GetString("CORS_ALLOW_ORIGINS", "http://localhost")}, ","), // TODO: remove localhost in production
-		AllowCredentials: true,                                                                                                                                                    // TODO: remove in production
+		AllowOrigins:     strings.Join([]string{config.ApiHost, config.CorsAllowOrigins}, ","),
+		AllowCredentials: config.CorsAllowCredentials,
 	}))
 
 	// TODO: add healthcheck middleware for liveness and readyness endpoints
@@ -90,7 +90,7 @@ func (r *Router) Init() {
 		Max:        6,
 		Expiration: 1 * time.Minute,
 		Next: func(c *fiber.Ctx) bool {
-			return config.GetBool("DISABLE_RATE_LIMITER", false)
+			return config.DisableRateLimiter
 		},
 	})
 	r.app.Post("/register", unauthorizedLimiter, r.userHandler.Register)
@@ -101,7 +101,7 @@ func (r *Router) Init() {
 		Max:        300,
 		Expiration: 1 * time.Minute,
 		Next: func(c *fiber.Ctx) bool {
-			return config.GetBool("DISABLE_RATE_LIMITER", false)
+			return config.DisableRateLimiter
 		},
 	}))
 
@@ -134,7 +134,7 @@ func (r *Router) Init() {
 	r.app.Get("/metrics", r.sessionMiddleware.AllowRole(admin), monitor.New())
 
 	// setup pprof monitoring middleware
-	r.app.Use(r.sessionMiddleware.AllowRole(admin), pprof.New(pprof.Config{Prefix: config.GetString("API_BASE_PATH", "/api")}))
+	r.app.Use(r.sessionMiddleware.AllowRole(admin), pprof.New())
 
 	r.app.Post("/logout", r.userHandler.Logout)
 	r.initUserRoutes(r.app.Group("/users"))

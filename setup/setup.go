@@ -23,15 +23,15 @@ import (
 )
 
 func Setup() *fiber.App {
-	docs.SwaggerInfo.Host = config.GetString("API_HOST", "https://lighthouse.uni-kiel.de")
-	docs.SwaggerInfo.BasePath = config.GetString("API_BASE_PATH", "/api")
+	docs.SwaggerInfo.Host = config.ApiHost
+	docs.SwaggerInfo.BasePath = config.ApiBasePath
 
 	log.Println("Starting Heimdall")
 	app := fiber.New(fiber.Config{
 		AppName:       "Heimdall",
 		CaseSensitive: true,
 		StrictRouting: true,
-		ProxyHeader:   config.GetString("PROXY_HEADER", "X-Real-Ip"),
+		ProxyHeader:   config.ProxyHeader,
 	})
 
 	// Dependency Injection
@@ -45,10 +45,10 @@ func Setup() *fiber.App {
 
 	// session store
 	storage := fiberRedis.New(fiberRedis.Config{
-		Host:      config.GetString("REDIS_HOST", "127.0.0.1"),
-		Port:      config.GetInt("REDIS_PORT", 6379),
-		Username:  config.GetString("REDIS_USER", ""),
-		Password:  config.GetString("REDIS_PASSWORD", ""),
+		Host:      config.RedisHost,
+		Port:      config.RedisPort,
+		Username:  config.RedisUser,
+		Password:  config.RedisPassword,
 		Database:  1, // use db 1 for sessions
 		Reset:     false,
 		TLSConfig: nil,
@@ -133,7 +133,7 @@ func setupApplication(app *fiber.App, db *gorm.DB, redisdb *redis.Client, store 
 	routa.Init()
 	printRoutes(routa.ListRoutes())
 
-	if config.GetBool("USE_TEST_DATABASE", false) { // TODO: remove in prod - this function deletes the whole database
+	if config.UseTestDatabase { // TODO: remove in prod - this function deletes the whole database
 		setupTestDatabase(db, redisdb, store, userService, roleService, registrationKeyService)
 	}
 }

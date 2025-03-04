@@ -16,11 +16,11 @@ import (
 // connectPostgres opens a connection to the PostgreSQL database for GORM to use
 func connectPostgres() (*gorm.DB, error) {
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		config.GetString("DB_HOST", "localhost"),
-		config.GetInt("DB_PORT", 5432),
-		config.GetString("DB_USER", "postgres"),
-		config.GetString("DB_PASS", "postgres"),
-		config.GetString("DB_NAME", "heimdall"))
+		config.DatabaseHost,
+		config.DatabasePort,
+		config.DatabaseUser,
+		config.DatabasePassword,
+		config.DatabaseName)
 
 	db, err := gorm.Open(postgres.New(postgres.Config{
 		DSN: dsn,
@@ -46,9 +46,9 @@ func connectPostgres() (*gorm.DB, error) {
 
 func connectRedis(dbNumber int) (*redis.Client, error) {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     config.GetString("REDIS_HOST", "127.0.0.1") + ":" + config.GetString("REDIS_PORT", "6379"),
-		Username: config.GetString("REDIS_USER", ""),
-		Password: config.GetString("REDIS_PASSWORD", ""),
+		Addr:     fmt.Sprintf("%s:%d", config.RedisHost, config.RedisPort),
+		Username: config.RedisUser,
+		Password: config.RedisPassword,
 		DB:       dbNumber,
 	})
 	if err := rdb.Ping(context.TODO()).Err(); err != nil {

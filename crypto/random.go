@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 )
 
+// TODO: maybe use more characters (include special characters)
 const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 func NewRandomAlphaNumString(length int) (string, error) {
