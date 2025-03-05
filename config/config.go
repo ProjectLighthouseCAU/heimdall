@@ -34,7 +34,7 @@ var (
 	ProxyHeader string = getString("PROXY_HEADER", "X-Real-Ip") // "X-Real-Ip" behind a reverse proxy and "" for hosting without a proxy
 
 	// Cross-Origin-Resource-Sharing
-	CorsAllowOrigins     string = getString("CORS_ALLOW_ORIGINS", "")
+	CorsAllowOrigins     string = getString("CORS_ALLOW_ORIGINS", ApiHost) // by default only allow the API host, add allowed origins by appending them separated with commas
 	CorsAllowCredentials bool   = getBool("CORS_ALLOW_CREDENTIALS", false)
 
 	// Rate limiter
@@ -94,8 +94,11 @@ func getDuration(key string, defaultValue time.Duration) time.Duration {
 }
 
 func parseIPs(ipsString string) []net.IP {
-	ipStrings := strings.Split(ipsString, ",")
 	var ips []net.IP
+	if ipsString == "" {
+		return ips
+	}
+	ipStrings := strings.Split(ipsString, ",")
 	for _, ipString := range ipStrings {
 		ip := net.ParseIP(ipString)
 		if ip == nil {

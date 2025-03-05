@@ -2,7 +2,6 @@ package router
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"slices"
@@ -96,7 +95,7 @@ func (r *Router) Init(sessionStore *session.Store, readynessProbe func(*fiber.Ct
 
 	// setup CORS middleware
 	r.app.Use(cors.New(cors.Config{
-		AllowOrigins:     strings.Join([]string{config.ApiHost, config.CorsAllowOrigins}, ","),
+		AllowOrigins:     config.CorsAllowOrigins,
 		AllowCredentials: config.CorsAllowCredentials,
 	}))
 
@@ -147,6 +146,7 @@ func (r *Router) Init(sessionStore *session.Store, readynessProbe func(*fiber.Ct
 	r.app.Get("/swagger", swag)
 	r.app.Get("/swagger/*", swag)
 
+	r.app.Get("/internal/users", r.ipAddressMiddleware.AllowLoopbackPrivateAndIPs(config.InternalIPs), r.tokenHandler.GetUsernames)
 	r.app.Post("/internal/authenticate", r.ipAddressMiddleware.AllowLoopbackPrivateAndIPs(config.InternalIPs), r.tokenHandler.WatchAuthChanges) // this endpoint authenticates requests by API token itself
 
 	// all requests to routes after this point have to be authenticated

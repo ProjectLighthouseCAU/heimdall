@@ -72,6 +72,26 @@ func (tc *TokenHandler) Delete(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
+// @Summary      Get a list of all usernames
+// @Description  Returns a list of all users names
+// @Tags         Auth (internal)
+// @Produce      json
+// @Success      200  {object}  []string
+// @Failure      401  "Unauthorized"
+// @Failure      500  "Internal Server Error"
+// @Router       /internal/users [get]
+func (tc *TokenHandler) GetUsernames(c *fiber.Ctx) error {
+	users, err := tc.userService.GetAll()
+	if err != nil {
+		return UnwrapAndSendError(c, err)
+	}
+	var usernames []string
+	for _, user := range users {
+		usernames = append(usernames, user.Username)
+	}
+	return c.JSON(usernames)
+}
+
 type AuthRequest struct {
 	Username string `json:"username"`
 	Token    string `json:"api_token"`
@@ -81,11 +101,9 @@ type AuthRequest struct {
 // @Description  If the initial request was successful, the connection is kept alive and updates are sent using server sent events (SSE).
 // @Tags         Auth (internal)
 // @Produce      json
-// @Success      200  {object}  APIToken
+// @Success      200  {object} AuthUpdateMessage
 // @Failure      400  "Bad Request"
 // @Failure      401  "Unauthorized"
-// @Failure      403  "Forbidden"
-// @Failure      404  "Not Found"
 // @Failure      500  "Internal Server Error"
 // @Router       /internal/authenticate [post]
 func (tc *TokenHandler) WatchAuthChanges(c *fiber.Ctx) error {
@@ -112,7 +130,7 @@ func (tc *TokenHandler) WatchAuthChanges(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
-	// prepare first response:
+	// prepare first response
 	var roles []string
 	for _, role := range user.Roles {
 		roles = append(roles, role.Name)
@@ -136,25 +154,20 @@ func (tc *TokenHandler) WatchAuthChanges(c *fiber.Ctx) error {
 			select {
 			case m, ok := <-ch:
 				if !ok {
-					// log.Println("channel closed, disconnecting client")
 					return
 				}
 				err := writeAndFlushJson(w, m) // send update
 				if err != nil {
-					// log.Println(err)
 					return
 				}
 			case <-time.After(time.Second): // detect closed connection
 				err := writeAndFlushBytes(w, []byte{'\r', '\n'}) // send keepalive message (just newline without content)
 				if err != nil {
-					// log.Println(err)
 					return
 				}
 			}
 		}
 	}))
-
-	// log.Println("End of WatchAuthChanges")
 	return nil
 }
 
