@@ -13,12 +13,6 @@ import (
 	"github.com/ProjectLighthouseCAU/heimdall/repository"
 )
 
-// TODO: implement permanent API tokens!
-// TODO: notify Beacon about username changed and user deleted (DONE)
-// DON'T: let Beacon delete resources based on the AuthUpdateMessages alone - Beacon is not always subscribed to every user's AuthUpdates
-// TODO: let Beacon delete resource when username_invalid is true
-// TODO: add endpoint for Beacon to query the list of usernames (for creating and deleting resources / user directories)
-
 type TokenService struct {
 	tokenRepository repository.TokenRepository
 	userRepository  repository.UserRepository
@@ -45,7 +39,7 @@ func newRandomToken() (string, error) {
 // Returns true if the token was generated
 func (ts *TokenService) GenerateApiTokenIfNotExists(user *model.User) (bool, error) {
 	token := user.ApiToken
-	if token != nil && token.ExpiresAt.After(time.Now()) {
+	if token != nil && (user.PermanentAPIToken || token.ExpiresAt.After(time.Now())) {
 		return false, nil
 	}
 	newToken, err := newRandomToken()
@@ -79,6 +73,7 @@ func (ts *TokenService) GenerateApiTokenIfNotExists(user *model.User) (bool, err
 			Username:        user.Username,
 			Token:           token.Token,
 			ExpiresAt:       token.ExpiresAt,
+			Permanent:       user.PermanentAPIToken,
 			Roles:           roles,
 			UsernameInvalid: false,
 		}
@@ -108,6 +103,7 @@ func (ts *TokenService) NotifyUsernameInvalid(user *model.User) {
 			Username:        user.Username,
 			Token:           "",
 			ExpiresAt:       time.Now(),
+			Permanent:       false,
 			Roles:           []string{},
 			UsernameInvalid: true,
 		}
@@ -138,6 +134,7 @@ func (ts *TokenService) NotifyRoleUpdate(user *model.User) error {
 			Username:        user.Username,
 			Token:           token.Token,
 			ExpiresAt:       token.ExpiresAt,
+			Permanent:       user.PermanentAPIToken,
 			Roles:           roles,
 			UsernameInvalid: false,
 		}
@@ -170,7 +167,6 @@ func (ts *TokenService) SubscribeToChanges(username string) chan *model.AuthUpda
 	} else {
 		ts.openAuthConnections[username] = append(ts.openAuthConnections[username], c)
 	}
-	log.Println("Subscribed to", username)
 	return c
 }
 
@@ -189,7 +185,6 @@ func (ts *TokenService) UnsubscribeFromChanges(username string, c chan *model.Au
 	if !slices.Contains(chans, c) {
 		return errors.New("this channel has not subscribed to " + username)
 	}
-	log.Println("Unsubscribed from", username)
 	// delete entire map key if this is the only subscription
 	if len(chans) <= 1 {
 		delete(ts.openAuthConnections, username)

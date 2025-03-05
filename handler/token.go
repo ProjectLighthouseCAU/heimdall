@@ -139,6 +139,7 @@ func (tc *TokenHandler) WatchAuthChanges(c *fiber.Ctx) error {
 		Username:        user.Username,
 		Token:           user.ApiToken.Token,
 		ExpiresAt:       user.ApiToken.ExpiresAt,
+		Permanent:       user.PermanentAPIToken,
 		Roles:           roles,
 		UsernameInvalid: false,
 	}
@@ -161,7 +162,7 @@ func (tc *TokenHandler) WatchAuthChanges(c *fiber.Ctx) error {
 					return
 				}
 			case <-time.After(time.Second): // detect closed connection
-				err := writeAndFlushBytes(w, []byte{'\r', '\n'}) // send keepalive message (just newline without content)
+				err := writeAndFlushBytes(w, []byte("null\r\n")) // send keepalive message (just newline without content)
 				if err != nil {
 					return
 				}

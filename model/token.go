@@ -15,6 +15,7 @@ type AuthUpdateMessage struct {
 	Username        string    `json:"username"`         // unique username associated with this token
 	Token           string    `json:"api_token"`        // the actual API token
 	ExpiresAt       time.Time `json:"expires_at"`       // expiration date of this token
+	Permanent       bool      `json:"permanent"`        // no expiration (ignore ExpiresAt)
 	Roles           []string  `json:"roles"`            // roles associated with this token
 	UsernameInvalid bool      `json:"username_invalid"` // true, if user was deleted or changed its username
 } //@name AuthUpdateMessage
