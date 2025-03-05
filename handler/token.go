@@ -3,7 +3,6 @@ package handler
 import (
 	"bufio"
 	"encoding/json"
-	"net"
 	"time"
 
 	"github.com/ProjectLighthouseCAU/heimdall/model"
@@ -88,18 +87,8 @@ type AuthRequest struct {
 // @Failure      403  "Forbidden"
 // @Failure      404  "Not Found"
 // @Failure      500  "Internal Server Error"
-// @Router       /internal/authenticate [get]
-// TODO: think about path
+// @Router       /internal/authenticate [post]
 func (tc *TokenHandler) WatchAuthChanges(c *fiber.Ctx) error {
-	// TODO: move to middleware
-	// log.Println(c.IP())
-	clientIp := net.ParseIP(c.IP())
-	// log.Println("Client IP:", clientIp)
-
-	if !(clientIp.IsPrivate() || clientIp.IsLoopback()) {
-		return c.SendStatus(fiber.StatusUnauthorized)
-	}
-
 	c.Set("Content-Type", "text/event-stream")
 	c.Set("Cache-Control", "no-cache")
 	c.Set("Connection", "keep-alive")

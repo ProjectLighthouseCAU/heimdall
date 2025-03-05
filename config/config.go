@@ -2,8 +2,10 @@ package config
 
 import (
 	"log"
+	"net"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -29,10 +31,10 @@ var (
 	ApiHost     string = getString("API_HOST", "https://lighthouse.uni-kiel.de") // for CORS and Swagger UI API documentation
 	ApiBasePath string = getString("API_BASE_PATH", "/api")                      // used only for Swagger UI
 
-	ProxyHeader string = getString("PROXY_HEADER", "X-Real-Ip")
+	ProxyHeader string = getString("PROXY_HEADER", "X-Real-Ip") // "X-Real-Ip" behind a reverse proxy and "" for hosting without a proxy
 
 	// Cross-Origin-Resource-Sharing
-	CorsAllowOrigins     string = getString("CORS_ALLOW_ORIGINS", "http://localhost")
+	CorsAllowOrigins     string = getString("CORS_ALLOW_ORIGINS", "")
 	CorsAllowCredentials bool   = getBool("CORS_ALLOW_CREDENTIALS", false)
 
 	// Rate limiter
@@ -43,6 +45,7 @@ var (
 	RegistrationKeyLength  int           = getInt("REGISTRATION_KEY_LENGTH", 20)
 	ApiTokenExpirationTime time.Duration = getDuration("API_TOKEN_EXPIRATION_TIME", 3*24*time.Hour)
 	MinPasswordLength      int           = getInt("MIN_PASSWORD_LENGTH", 12)
+	InternalIPs            []net.IP      = parseIPs(getString("INTERNAL_IPS", ""))
 
 	UseTestDatabase bool = getBool("USE_TEST_DATABASE", false) // TODO: remove in prod - this function deletes the whole database
 )
@@ -88,4 +91,17 @@ func getDuration(key string, defaultValue time.Duration) time.Duration {
 		return d
 	}
 	return defaultValue
+}
+
+func parseIPs(ipsString string) []net.IP {
+	ipStrings := strings.Split(ipsString, ",")
+	var ips []net.IP
+	for _, ipString := range ipStrings {
+		ip := net.ParseIP(ipString)
+		if ip == nil {
+			panic("Error: could not parse IP from INTERNAL_IPS: " + ipString)
+		}
+		ips = append(ips, ip)
+	}
+	return ips
 }

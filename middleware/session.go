@@ -37,7 +37,7 @@ func NewSessionMiddleware(sessionStore *session.Store,
 			return handler.UnwrapAndSendError(c, model.UnauthorizedError{})
 		}
 		c.Locals("user", user)
-		tokenService.GenerateApiTokenIfNotExists(user) // TODO: maybe only on login and register?
+		tokenService.GenerateApiTokenIfNotExists(user)
 		return c.Next()
 	}
 }

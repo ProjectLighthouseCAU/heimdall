@@ -1,6 +1,7 @@
 package setup
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"runtime"
@@ -41,7 +42,7 @@ func Setup() *fiber.App {
 	panicOnError(err)
 
 	// session store
-	storage := redis.New(redis.Config{
+	sessionStorage := redis.New(redis.Config{
 		Host:      config.RedisHost,
 		Port:      config.RedisPort,
 		Username:  config.RedisUser,
@@ -52,8 +53,8 @@ func Setup() *fiber.App {
 		PoolSize:  10 * runtime.GOMAXPROCS(0),
 	})
 
-	store := session.New(session.Config{
-		Storage:        storage,
+	sessionStore := session.New(session.Config{
+		Storage:        sessionStorage,
 		Expiration:     24 * time.Hour,
 		KeyLookup:      "cookie:session_id",
 		KeyGenerator:   utils.UUIDv4,
@@ -62,7 +63,7 @@ func Setup() *fiber.App {
 		CookieHTTPOnly: false,  // TODO: change to true in production
 	})
 
-	setupApplication(app, db, store)
+	setupApplication(app, db, sessionStore)
 
 	return app
 }
@@ -116,6 +117,7 @@ func setupApplication(app *fiber.App, db *gorm.DB, store *session.Store) {
 
 	// middleware
 	sessionMiddleware := middleware.NewSessionMiddleware(store, userService, tokenService)
+	ipAddressMiddleware := middleware.NewIPAddressMiddleware()
 
 	// router
 	routa := router.NewRouter(
@@ -125,9 +127,34 @@ func setupApplication(app *fiber.App, db *gorm.DB, store *session.Store) {
 		roleHandler,
 		tokenHandler,
 		sessionMiddleware,
+		ipAddressMiddleware,
 	)
 
-	routa.Init()
+	// readyness probe
+	readynessProbe := func(c *fiber.Ctx) bool {
+		// Ping redis
+		ctx, cancelCtx := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancelCtx()
+		err := store.Storage.(*redis.Storage).Conn().Ping(ctx).Err()
+		if err != nil {
+			log.Println("Readyness check failed for Redis:", err)
+			return false
+		}
+		// Ping postgres
+		db, err := db.DB()
+		if err != nil {
+			log.Println("Readyness check failed for PostgreSQL:", err)
+			return false
+		}
+		err = db.Ping()
+		if err != nil {
+			log.Println("Readyness check failed for PostgreSQL:", err)
+			return false
+		}
+		return true
+	}
+
+	routa.Init(store, readynessProbe)
 	printRoutes(routa.ListRoutes())
 
 	if config.UseTestDatabase { // TODO: remove in prod - this function deletes the whole database

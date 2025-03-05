@@ -14,12 +14,14 @@ import (
 	swagger "github.com/arsmn/fiber-swagger/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/healthcheck"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
 	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/monitor"
 	"github.com/gofiber/fiber/v2/middleware/pprof"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v2/middleware/session"
 )
 
 var (
@@ -33,6 +35,7 @@ type Router struct {
 	roleHandler            handler.RoleHandler
 	tokenHandler           handler.TokenHandler
 	sessionMiddleware      middleware.SessionMiddleware
+	ipAddressMiddleware    middleware.IPAddressMiddleware
 }
 
 func NewRouter(app *fiber.App,
@@ -40,8 +43,9 @@ func NewRouter(app *fiber.App,
 	regKeyHandler handler.RegistrationKeyHandler,
 	roleHandler handler.RoleHandler,
 	tokenHandler handler.TokenHandler,
-	sessionMiddleware middleware.SessionMiddleware) Router {
-	return Router{app, userHandler, regKeyHandler, roleHandler, tokenHandler, sessionMiddleware}
+	sessionMiddleware middleware.SessionMiddleware,
+	ipAddressMiddleware middleware.IPAddressMiddleware) Router {
+	return Router{app, userHandler, regKeyHandler, roleHandler, tokenHandler, sessionMiddleware, ipAddressMiddleware}
 }
 
 /*
@@ -63,7 +67,7 @@ user:
 	(GET /registration-keys/<own-reg-key-id>)
 */
 
-func (r *Router) Init() {
+func (r *Router) Init(sessionStore *session.Store, readynessProbe func(*fiber.Ctx) bool) {
 	// log requests and responses
 	r.app.Use(logger.New())
 
@@ -74,7 +78,21 @@ func (r *Router) Init() {
 	r.app.Use(helmet.New())
 
 	// FIXME: csrf prevents everything except GET requests
-	// app.Use(csrf.New())
+	// r.app.Use(csrf.New(csrf.Config{
+	// 	KeyLookup:         "header:" + csrf.HeaderName,
+	// 	CookieName:        "__Host-csrf_",
+	// 	CookieSameSite:    "Lax",
+	// 	CookieSecure:      true,
+	// 	CookieSessionOnly: true,
+	// 	CookieHTTPOnly:    true,
+	// 	Expiration:        1 * time.Hour,
+	// 	KeyGenerator:      utils.UUIDv4,
+	// 	ContextKey:        nil,
+	// 	Extractor:         csrf.CsrfFromHeader(csrf.HeaderName),
+	// 	Session:           sessionStore,
+	// 	SessionKey:        "fiber.csrf.token",
+	// 	HandlerContextKey: "fiber.csrf.handler",
+	// }))
 
 	// setup CORS middleware
 	r.app.Use(cors.New(cors.Config{
@@ -82,8 +100,12 @@ func (r *Router) Init() {
 		AllowCredentials: config.CorsAllowCredentials,
 	}))
 
-	// TODO: add healthcheck middleware for liveness and readyness endpoints
-	// r.app.Use(healthcheck.New())
+	r.app.Use(healthcheck.New(healthcheck.Config{
+		LivenessProbe:     func(c *fiber.Ctx) bool { return true },
+		LivenessEndpoint:  "/live",
+		ReadinessProbe:    readynessProbe,
+		ReadinessEndpoint: "/ready",
+	}))
 
 	// allow login and register once every 10 seconds per client
 	unauthorizedLimiter := limiter.New(limiter.Config{
@@ -125,7 +147,7 @@ func (r *Router) Init() {
 	r.app.Get("/swagger", swag)
 	r.app.Get("/swagger/*", swag)
 
-	r.app.Post("/internal/authenticate", r.tokenHandler.WatchAuthChanges) // this endpoint authenticates requests by API token itself
+	r.app.Post("/internal/authenticate", r.ipAddressMiddleware.AllowLoopbackPrivateAndIPs(config.InternalIPs), r.tokenHandler.WatchAuthChanges) // this endpoint authenticates requests by API token itself
 
 	// all requests to routes after this point have to be authenticated
 	r.app.Use((fiber.Handler)(r.sessionMiddleware))
