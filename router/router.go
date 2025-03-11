@@ -24,7 +24,8 @@ import (
 )
 
 var (
-	admin = config.AdminRoleName
+	admin  = config.AdminRoleName
+	deploy = config.DeployRoleName
 )
 
 type Router struct {
@@ -34,7 +35,7 @@ type Router struct {
 	roleHandler            handler.RoleHandler
 	tokenHandler           handler.TokenHandler
 	sessionMiddleware      middleware.SessionMiddleware
-	ipAddressMiddleware    middleware.IPAddressMiddleware
+	tokenMiddleware        middleware.TokenMiddleware
 }
 
 func NewRouter(app *fiber.App,
@@ -43,8 +44,8 @@ func NewRouter(app *fiber.App,
 	roleHandler handler.RoleHandler,
 	tokenHandler handler.TokenHandler,
 	sessionMiddleware middleware.SessionMiddleware,
-	ipAddressMiddleware middleware.IPAddressMiddleware) Router {
-	return Router{app, userHandler, regKeyHandler, roleHandler, tokenHandler, sessionMiddleware, ipAddressMiddleware}
+	tokenMiddleware middleware.TokenMiddleware) Router {
+	return Router{app, userHandler, regKeyHandler, roleHandler, tokenHandler, sessionMiddleware, tokenMiddleware}
 }
 
 /*
@@ -117,6 +118,8 @@ func (r *Router) Init(sessionStore *session.Store, readynessProbe func(*fiber.Ct
 	r.app.Post("/register", unauthorizedLimiter, r.userHandler.Register)
 	r.app.Post("/login", unauthorizedLimiter, r.userHandler.Login)
 
+	r.initInternalRoutes(r.app.Group("/internal")) // not rate limited and without session middleware
+
 	// allow 5 requests per second per client
 	r.app.Use(limiter.New(limiter.Config{
 		Max:        300,
@@ -146,9 +149,6 @@ func (r *Router) Init(sessionStore *session.Store, readynessProbe func(*fiber.Ct
 	r.app.Get("/swagger", swag)
 	r.app.Get("/swagger/*", swag)
 
-	r.app.Get("/internal/users", r.ipAddressMiddleware.AllowLoopbackPrivateAndIPs(config.InternalIPs), r.tokenHandler.GetUsernames)
-	r.app.Post("/internal/authenticate", r.ipAddressMiddleware.AllowLoopbackPrivateAndIPs(config.InternalIPs), r.tokenHandler.WatchAuthChanges) // this endpoint authenticates requests by API token itself
-
 	// all requests to routes after this point have to be authenticated
 	r.app.Use((fiber.Handler)(r.sessionMiddleware))
 
@@ -167,6 +167,13 @@ func (r *Router) Init(sessionStore *session.Store, readynessProbe func(*fiber.Ct
 	r.app.All("*", func(c *fiber.Ctx) error {
 		return handler.UnwrapAndSendError(c, model.NotFoundError{Message: fmt.Sprintf("Cannot %s %s", c.Method(), c.Path())})
 	})
+}
+
+func (r *Router) initInternalRoutes(internal fiber.Router) {
+	internal.Use(middleware.AllowLoopbackAndPrivateIPsAnd(config.InternalIPs))
+	internal.Use((fiber.Handler)(r.tokenMiddleware), r.tokenMiddleware.AllowRole(deploy))
+	internal.Get("/users", r.tokenHandler.GetUsernames)
+	internal.Get("/authenticate/:username<string>", r.tokenHandler.WatchAuthChanges)
 }
 
 func (r *Router) initUserRoutes(users fiber.Router) {

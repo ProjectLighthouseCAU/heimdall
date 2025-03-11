@@ -31,8 +31,8 @@ var (
 	ApiHost     string = getString("API_HOST", "https://lighthouse.uni-kiel.de") // for CORS and Swagger UI API documentation
 	ApiBasePath string = getString("API_BASE_PATH", "/api")                      // used only for Swagger UI
 
-	ProxyHeader string = getString("PROXY_HEADER", "X-Real-Ip") // "X-Real-Ip" behind a reverse proxy and "" for hosting without a proxy
-
+	ProxyHeader  string = getString("PROXY_HEADER", "X-Real-Ip") // "X-Real-Ip" behind a reverse proxy and "" for hosting without a proxy
+	TrustedProxy string = getString("TRUSTED_PROXY", "traefik")
 	// Cross-Origin-Resource-Sharing
 	CorsAllowOrigins     string = getString("CORS_ALLOW_ORIGINS", ApiHost) // by default only allow the API host, add allowed origins by appending them separated with commas
 	CorsAllowCredentials bool   = getBool("CORS_ALLOW_CREDENTIALS", false)
@@ -42,6 +42,7 @@ var (
 
 	// Domain specific config
 	AdminRoleName          string        = getString("ADMIN_ROLENAME", "admin")
+	DeployRoleName         string        = getString("DEPLOY_ROLENAME", "deploy")
 	RegistrationKeyLength  int           = getInt("REGISTRATION_KEY_LENGTH", 20)
 	ApiTokenExpirationTime time.Duration = getDuration("API_TOKEN_EXPIRATION_TIME", 3*24*time.Hour)
 	MinPasswordLength      int           = getInt("MIN_PASSWORD_LENGTH", 12)

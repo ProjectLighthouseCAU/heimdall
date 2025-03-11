@@ -28,10 +28,12 @@ func Setup() *fiber.App {
 
 	log.Println("Starting Heimdall")
 	app := fiber.New(fiber.Config{
-		AppName:       "Heimdall",
-		CaseSensitive: true,
-		StrictRouting: true,
-		ProxyHeader:   config.ProxyHeader,
+		AppName:                 "Heimdall",
+		CaseSensitive:           true,
+		StrictRouting:           true,
+		ProxyHeader:             config.ProxyHeader,
+		EnableTrustedProxyCheck: true,
+		TrustedProxies:          []string{config.TrustedProxy},
 	})
 
 	// Dependency Injection
@@ -117,7 +119,7 @@ func setupApplication(app *fiber.App, db *gorm.DB, store *session.Store) {
 
 	// middleware
 	sessionMiddleware := middleware.NewSessionMiddleware(store, userService, tokenService)
-	ipAddressMiddleware := middleware.NewIPAddressMiddleware()
+	tokenMiddleware := middleware.NewTokenMiddleware(&userService, &tokenRepository)
 
 	// router
 	routa := router.NewRouter(
@@ -127,7 +129,7 @@ func setupApplication(app *fiber.App, db *gorm.DB, store *session.Store) {
 		roleHandler,
 		tokenHandler,
 		sessionMiddleware,
-		ipAddressMiddleware,
+		tokenMiddleware,
 	)
 
 	// readyness probe

@@ -18,11 +18,20 @@ type TokenService struct {
 	userRepository  repository.UserRepository
 
 	openAuthConnections map[string][]chan *model.AuthUpdateMessage // username -> update channel
-	lock                *sync.Mutex
+	authConnectionsLock *sync.Mutex
+
+	userCreateDeleteEventConnections     map[chan *model.UserUpdateMessage]struct{}
+	userCreateDeleteEventConnectionsLock *sync.Mutex
 }
 
 func NewTokenService(tokenRepository repository.TokenRepository, userRepository repository.UserRepository) TokenService {
-	return TokenService{tokenRepository, userRepository, make(map[string][]chan *model.AuthUpdateMessage), &sync.Mutex{}}
+	return TokenService{tokenRepository,
+		userRepository,
+		make(map[string][]chan *model.AuthUpdateMessage),
+		&sync.Mutex{},
+		make(map[chan *model.UserUpdateMessage]struct{}),
+		&sync.Mutex{},
+	}
 }
 
 func newRandomToken() (string, error) {
@@ -57,8 +66,8 @@ func (ts *TokenService) GenerateApiTokenIfNotExists(user *model.User) (bool, err
 	}
 
 	// notify subscribers
-	ts.lock.Lock()
-	defer ts.lock.Unlock()
+	ts.authConnectionsLock.Lock()
+	defer ts.authConnectionsLock.Unlock()
 
 	chans := ts.openAuthConnections[user.Username]
 	if chans == nil {
@@ -70,12 +79,11 @@ func (ts *TokenService) GenerateApiTokenIfNotExists(user *model.User) (bool, err
 	}
 	for _, c := range chans {
 		c <- &model.AuthUpdateMessage{
-			Username:        user.Username,
-			Token:           token.Token,
-			ExpiresAt:       token.ExpiresAt,
-			Permanent:       user.PermanentAPIToken,
-			Roles:           roles,
-			UsernameInvalid: false,
+			Username:  user.Username,
+			Token:     token.Token,
+			ExpiresAt: token.ExpiresAt,
+			Permanent: user.PermanentAPIToken,
+			Roles:     roles,
 		}
 	}
 	return true, nil
@@ -91,22 +99,14 @@ func (ts *TokenService) NotifyUsernameInvalid(user *model.User) {
 	}
 
 	// notify subscribers
-	ts.lock.Lock()
-	defer ts.lock.Unlock()
+	ts.authConnectionsLock.Lock()
+	defer ts.authConnectionsLock.Unlock()
 
 	chans := ts.openAuthConnections[user.Username]
 	if chans == nil {
 		return
 	}
 	for _, c := range chans {
-		c <- &model.AuthUpdateMessage{ // TODO: maybe not needed? close of channel (and connection) signals that auth data is invalid -> ensure connection closes!
-			Username:        user.Username,
-			Token:           "",
-			ExpiresAt:       time.Now(),
-			Permanent:       false,
-			Roles:           []string{},
-			UsernameInvalid: true,
-		}
 		close(c) // closed channel (and therefore closed connection) indicates invalidated token
 	}
 }
@@ -114,8 +114,8 @@ func (ts *TokenService) NotifyUsernameInvalid(user *model.User) {
 // Notify that the roles of a user have changed
 // the given user must have its roles and api token field pre-loaded from the database before calling
 func (ts *TokenService) NotifyRoleUpdate(user *model.User) error {
-	ts.lock.Lock()
-	defer ts.lock.Unlock()
+	ts.authConnectionsLock.Lock()
+	defer ts.authConnectionsLock.Unlock()
 
 	chans := ts.openAuthConnections[user.Username]
 	if chans == nil {
@@ -131,12 +131,11 @@ func (ts *TokenService) NotifyRoleUpdate(user *model.User) error {
 	}
 	for _, c := range chans {
 		c <- &model.AuthUpdateMessage{
-			Username:        user.Username,
-			Token:           token.Token,
-			ExpiresAt:       token.ExpiresAt,
-			Permanent:       user.PermanentAPIToken,
-			Roles:           roles,
-			UsernameInvalid: false,
+			Username:  user.Username,
+			Token:     token.Token,
+			ExpiresAt: token.ExpiresAt,
+			Permanent: user.PermanentAPIToken,
+			Roles:     roles,
 		}
 	}
 	return nil
@@ -158,8 +157,8 @@ func (ts *TokenService) RegenerateApiToken(user *model.User) error {
 func (ts *TokenService) SubscribeToChanges(username string) chan *model.AuthUpdateMessage {
 	c := make(chan *model.AuthUpdateMessage, 1)
 
-	ts.lock.Lock()
-	defer ts.lock.Unlock()
+	ts.authConnectionsLock.Lock()
+	defer ts.authConnectionsLock.Unlock()
 
 	chans := ts.openAuthConnections[username]
 	if chans == nil {
@@ -175,8 +174,8 @@ func (ts *TokenService) UnsubscribeFromChanges(username string, c chan *model.Au
 		return errors.New("cannot unsubscribe from nil channel")
 	}
 
-	ts.lock.Lock()
-	defer ts.lock.Unlock()
+	ts.authConnectionsLock.Lock()
+	defer ts.authConnectionsLock.Unlock()
 
 	chans, ok := ts.openAuthConnections[username]
 	if !ok {
@@ -197,4 +196,43 @@ func (ts *TokenService) UnsubscribeFromChanges(username string, c chan *model.Au
 
 func deleteElement[S ~[]E, E comparable](s S, e E) S {
 	return slices.DeleteFunc(s, func(_e E) bool { return _e == e })
+}
+
+// User creation and deletion events
+
+func (ts *TokenService) NotifyUserCreated(user *model.User) {
+	ts.userCreateDeleteEventConnectionsLock.Lock()
+	defer ts.userCreateDeleteEventConnectionsLock.Unlock()
+	for c := range ts.userCreateDeleteEventConnections {
+		c <- &model.UserUpdateMessage{
+			Username: user.Username,
+			Removed:  false,
+		}
+	}
+}
+
+func (ts *TokenService) NotifyUserDeleted(user *model.User) {
+	ts.userCreateDeleteEventConnectionsLock.Lock()
+	defer ts.userCreateDeleteEventConnectionsLock.Unlock()
+	for c := range ts.userCreateDeleteEventConnections {
+		c <- &model.UserUpdateMessage{
+			Username: user.Username,
+			Removed:  true,
+		}
+	}
+}
+
+func (ts *TokenService) SubscribeToUserCreateDeleteEvents() chan *model.UserUpdateMessage {
+	c := make(chan *model.UserUpdateMessage, 1)
+	ts.userCreateDeleteEventConnectionsLock.Lock()
+	defer ts.userCreateDeleteEventConnectionsLock.Unlock()
+
+	ts.userCreateDeleteEventConnections[c] = struct{}{}
+	return c
+}
+
+func (ts *TokenService) UnsubscribeFromUserCreateDeleteEvents(c chan *model.UserUpdateMessage) {
+	ts.userCreateDeleteEventConnectionsLock.Lock()
+	defer ts.userCreateDeleteEventConnectionsLock.Unlock()
+	delete(ts.userCreateDeleteEventConnections, c)
 }

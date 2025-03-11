@@ -157,6 +157,7 @@ func (s *UserService) Register(username, password, email, registrationKey string
 			return nil, model.InternalServerError{Message: "could not save session", Err: err}
 		}
 	}
+	s.tokenService.NotifyUserCreated(savedUser)
 	_, err = s.tokenService.GenerateApiTokenIfNotExists(savedUser)
 	if err != nil {
 		return nil, err
@@ -182,7 +183,13 @@ func (s *UserService) Create(username, password, email string, permanentAPIToken
 		LastLogin:         nil,
 		PermanentAPIToken: permanentAPIToken,
 	}
-	return s.userRepository.Save(&user)
+
+	err = s.userRepository.Save(&user)
+	if err != nil {
+		return err
+	}
+	s.tokenService.NotifyUserCreated(&user)
+	return nil
 }
 
 func (s *UserService) Update(id uint, username, password, email string, permanentAPIToken bool) error {
@@ -237,8 +244,14 @@ func (s *UserService) DeleteByID(id uint) error {
 	}
 
 	// session.Destroy() // TODO: destroy all sessions of the deleted user, not this one!
+
+	err = s.userRepository.DeleteByID(id)
+	if err != nil {
+		return err
+	}
 	s.tokenService.NotifyUsernameInvalid(user)
-	return s.userRepository.DeleteByID(id)
+	s.tokenService.NotifyUserDeleted(user)
+	return nil
 }
 
 func (s *UserService) GetRolesOfUser(userid uint) ([]model.Role, error) {

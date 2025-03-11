@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"log"
 
 	"github.com/ProjectLighthouseCAU/heimdall/model"
 	"gorm.io/gorm"
@@ -19,6 +20,7 @@ func wrapError(err error) error {
 		if errors.Is(err, gorm.ErrForeignKeyViolated) {
 			return model.ConflictError{Message: "Foreign key constraint violated"}
 		}
+		log.Println(err)
 		return model.InternalServerError{Message: "Database error, see logs"}
 	}
 	return nil

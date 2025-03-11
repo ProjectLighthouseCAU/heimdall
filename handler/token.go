@@ -3,6 +3,7 @@ package handler
 import (
 	"bufio"
 	"encoding/json"
+	"log"
 	"time"
 
 	"github.com/ProjectLighthouseCAU/heimdall/model"
@@ -72,30 +73,14 @@ func (tc *TokenHandler) Delete(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusOK)
 }
 
-// @Summary      Get a list of all usernames
-// @Description  Returns a list of all users names
-// @Tags         Auth (internal)
-// @Produce      json
-// @Success      200  {object}  []string
-// @Failure      401  "Unauthorized"
-// @Failure      500  "Internal Server Error"
-// @Router       /internal/users [get]
-func (tc *TokenHandler) GetUsernames(c *fiber.Ctx) error {
-	users, err := tc.userService.GetAll()
-	if err != nil {
-		return UnwrapAndSendError(c, err)
-	}
-	var usernames []string
-	for _, user := range users {
-		usernames = append(usernames, user.Username)
-	}
-	return c.JSON(usernames)
-}
+// INTERNAL API
 
 type AuthRequest struct {
 	Username string `json:"username"`
 	Token    string `json:"api_token"`
 }
+
+var keepalive = []byte{'\r', '\n'} // keepalive message (just newline without content)
 
 // @Summary      Get and subscribe to updates of a user's api token and roles
 // @Description  If the initial request was successful, the connection is kept alive and updates are sent using server sent events (SSE).
@@ -105,28 +90,24 @@ type AuthRequest struct {
 // @Failure      400  "Bad Request"
 // @Failure      401  "Unauthorized"
 // @Failure      500  "Internal Server Error"
-// @Router       /internal/authenticate [post]
+// @Router       /internal/authenticate/{username} [post]
 func (tc *TokenHandler) WatchAuthChanges(c *fiber.Ctx) error {
 	c.Set("Content-Type", "text/event-stream")
 	c.Set("Cache-Control", "no-cache")
 	c.Set("Connection", "keep-alive")
 	c.Set("Transfer-Encoding", "chunked")
 
-	var request AuthRequest
-	if err := c.BodyParser(&request); err != nil {
-		return UnwrapAndSendError(c, model.BadRequestError{Message: "Could not parse request body", Err: err})
+	user, ok := c.Locals("user").(*model.User)
+	if !ok {
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	username := c.Params("username", "")
+	if username != user.Username {
+		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
-	if request.Username == "" {
-		return c.SendStatus(fiber.StatusBadRequest)
-	}
-
-	if request.Token == "" {
-		return c.SendStatus(fiber.StatusBadRequest)
-	}
-	user, err := tc.userService.GetByName(request.Username)
-	// user not found, has no token, tokens do not match or token is expired
-	if err != nil || user.ApiToken == nil || request.Token != user.ApiToken.Token || time.Now().After(user.ApiToken.ExpiresAt) {
+	// token is not permanent and expired
+	if !user.PermanentAPIToken && time.Now().After(user.ApiToken.ExpiresAt) {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
@@ -136,40 +117,84 @@ func (tc *TokenHandler) WatchAuthChanges(c *fiber.Ctx) error {
 		roles = append(roles, role.Name)
 	}
 	resp := model.AuthUpdateMessage{
-		Username:        user.Username,
-		Token:           user.ApiToken.Token,
-		ExpiresAt:       user.ApiToken.ExpiresAt,
-		Permanent:       user.PermanentAPIToken,
-		Roles:           roles,
-		UsernameInvalid: false,
+		Username:  user.Username,
+		Token:     user.ApiToken.Token,
+		ExpiresAt: user.ApiToken.ExpiresAt,
+		Permanent: user.PermanentAPIToken,
+		Roles:     roles,
 	}
 
 	c.Status(fiber.StatusOK).Context().SetBodyStreamWriter(fasthttp.StreamWriter(func(w *bufio.Writer) {
 		// send first response
-		writeAndFlushJson(w, resp)
+		err := writeAndFlushJson(w, resp)
+		if err != nil {
+			return
+		}
 
 		// subscribe to changes for this user (and unsubscribe on return)
 		ch := tc.tokenService.SubscribeToChanges(user.Username)
 		defer tc.tokenService.UnsubscribeFromChanges(user.Username, ch)
-		for {
-			select {
-			case m, ok := <-ch:
-				if !ok {
-					return
-				}
-				err := writeAndFlushJson(w, m) // send update
-				if err != nil {
-					return
-				}
-			case <-time.After(time.Second): // detect closed connection
-				err := writeAndFlushBytes(w, []byte("null\r\n")) // send keepalive message (just newline without content)
-				if err != nil {
-					return
-				}
-			}
-		}
+		forwardMessagesToClient(ch, w)
 	}))
 	return nil
+}
+
+// @Summary      Get a list of all usernames
+// @Description  Returns a list of all users names
+// @Tags         Auth (internal)
+// @Produce      json
+// @Success      200  {object}  []model.UserUpdateMessage
+// @Failure      401  "Unauthorized"
+// @Failure      500  "Internal Server Error"
+// @Router       /internal/users [get]
+func (tc *TokenHandler) GetUsernames(c *fiber.Ctx) error {
+	c.Set("Content-Type", "text/event-stream")
+	c.Set("Cache-Control", "no-cache")
+	c.Set("Connection", "keep-alive")
+	c.Set("Transfer-Encoding", "chunked")
+
+	log.Println("GET USERNAMES")
+
+	users, err := tc.userService.GetAll()
+	if err != nil {
+		return UnwrapAndSendError(c, err)
+	}
+	var messages []model.UserUpdateMessage
+	for _, user := range users {
+		messages = append(messages, model.UserUpdateMessage{Username: user.Username, Removed: false})
+	}
+	c.Status(fiber.StatusOK).Context().SetBodyStreamWriter(fasthttp.StreamWriter(func(w *bufio.Writer) {
+		// send first response
+		err := writeAndFlushMultipleJson(w, messages)
+		if err != nil {
+			return
+		}
+		ch := tc.tokenService.SubscribeToUserCreateDeleteEvents()
+		defer tc.tokenService.UnsubscribeFromUserCreateDeleteEvents(ch)
+		forwardMessagesToClient(ch, w)
+	}))
+
+	return nil
+}
+
+func forwardMessagesToClient[T any](ch chan T, w *bufio.Writer) {
+	for {
+		select {
+		case m, ok := <-ch:
+			if !ok {
+				return
+			}
+			err := writeAndFlushJson(w, m) // send update
+			if err != nil {
+				return
+			}
+		case <-time.After(time.Second): // detect closed connection
+			err := writeAndFlushBytes(w, keepalive) // send keepalive message (just newline without content)
+			if err != nil {
+				return
+			}
+		}
+	}
 }
 
 func writeAndFlushJson(w *bufio.Writer, value any) error {
@@ -179,6 +204,19 @@ func writeAndFlushJson(w *bufio.Writer, value any) error {
 	}
 	respJson = append(respJson, '\r', '\n')
 	return writeAndFlushBytes(w, respJson)
+}
+
+func writeAndFlushMultipleJson[T any](w *bufio.Writer, values []T) error {
+	var output []byte
+	for _, v := range values {
+		respJson, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+		respJson = append(respJson, '\r', '\n')
+		output = append(output, respJson...)
+	}
+	return writeAndFlushBytes(w, output)
 }
 
 func writeAndFlushBytes(w *bufio.Writer, bs []byte) error {
