@@ -1,8 +1,8 @@
 basePath: /api
 definitions:
-  APIToken:
-    description: API token that allows access to the websocket API (beacon) and probably
-      other APIs in the future
+  AuthUpdateMessage:
+    description: Message that is sent to notify subscribers (e.g. Beacon) on changes
+      to one of these authentication related values
     properties:
       api_token:
         description: the actual API token
@@ -10,6 +10,9 @@ definitions:
       expires_at:
         description: expiration date of this token
         type: string
+      permanent:
+        description: no expiration (ignore ExpiresAt)
+        type: boolean
       roles:
         description: roles associated with this token
         items:
@@ -107,6 +110,26 @@ definitions:
         description: ISO 8601 datetime
         type: string
     type: object
+  Token:
+    description: API token that allows access to the websocket API (beacon) and probably
+      other APIs in the future
+    properties:
+      api_token:
+        type: string
+      created_at:
+        description: ISO 8601 datetime
+        type: string
+      expires_at:
+        type: string
+      id:
+        description: id (primary key)
+        type: integer
+      updated_at:
+        description: ISO 8601 datetime
+        type: string
+      user:
+        $ref: '#/definitions/User'
+    type: object
   UpdateRegistrationKeyPayload:
     properties:
       description:
@@ -121,6 +144,8 @@ definitions:
       and time, permanent API token flag, registration key (if user registered with
       a key) and roles
     properties:
+      api_token:
+        $ref: '#/definitions/Token'
       created_at:
         description: ISO 8601 datetime
         type: string
@@ -153,6 +178,15 @@ definitions:
         description: must be unique
         type: string
     type: object
+  UserUpdateMessage:
+    description: Message that is sent to notify subscribers (e.g. Beacon) when a new
+      user is created or a user is removed
+    properties:
+      removed:
+        type: boolean
+      username:
+        type: string
+    type: object
 host: https://lighthouse.uni-kiel.de
 info:
   contact: {}
@@ -162,6 +196,45 @@ info:
   title: Heimdall Lighthouse API
   version: "0.1"
 paths:
+  /internal/authenticate/{username}:
+    post:
+      description: If the initial request was successful, the connection is kept alive
+        and updates are sent using server sent events (SSE).
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/AuthUpdateMessage'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: Get and subscribe to updates of a user's api token and roles
+      tags:
+      - Auth (internal)
+  /internal/users:
+    get:
+      description: Returns a list of all users names
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/UserUpdateMessage'
+            type: array
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: Get a list of all usernames
+      tags:
+      - Auth (internal)
   /login:
     post:
       consumes:
@@ -828,7 +901,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/APIToken'
+            $ref: '#/definitions/Token'
         "400":
           description: Bad Request
         "401":
@@ -857,7 +930,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/APIToken'
+            $ref: '#/definitions/Token'
         "400":
           description: Bad Request
         "401":

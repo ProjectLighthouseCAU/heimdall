@@ -27,7 +27,7 @@ func NewTokenHandler(tokenService service.TokenService,
 // @Tags         Users
 // @Produce      json
 // @Param        id  path  int  true  "User ID"
-// @Success      200  {object}  APIToken
+// @Success      200  {object}  model.Token
 // @Failure      400  "Bad Request"
 // @Failure      401  "Unauthorized"
 // @Failure      403  "Forbidden"
@@ -51,7 +51,7 @@ func (tc *TokenHandler) Get(c *fiber.Ctx) error {
 // @Tags         Users
 // @Produce      plain
 // @Param        id   path      int  true  "User ID"
-// @Success      200  {object}  APIToken
+// @Success      200  {object}  model.Token
 // @Failure      400  "Bad Request"
 // @Failure      401  "Unauthorized"
 // @Failure      403  "Forbidden"

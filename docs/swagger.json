@@ -9,6 +9,64 @@
     "host": "https://lighthouse.uni-kiel.de",
     "basePath": "/api",
     "paths": {
+        "/internal/authenticate/{username}": {
+            "post": {
+                "description": "If the initial request was successful, the connection is kept alive and updates are sent using server sent events (SSE).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth (internal)"
+                ],
+                "summary": "Get and subscribe to updates of a user's api token and roles",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/AuthUpdateMessage"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/internal/users": {
+            "get": {
+                "description": "Returns a list of all users names",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth (internal)"
+                ],
+                "summary": "Get a list of all usernames",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/UserUpdateMessage"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
         "/login": {
             "post": {
                 "description": "Log in with username and password (sets a cookie with the session id). Returns the full user information if the login was successful or the user is already logged in.",
@@ -1002,7 +1060,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/APIToken"
+                            "$ref": "#/definitions/Token"
                         }
                     },
                     "400": {
@@ -1044,7 +1102,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/APIToken"
+                            "$ref": "#/definitions/Token"
                         }
                     },
                     "400": {
@@ -1114,8 +1172,8 @@
         }
     },
     "definitions": {
-        "APIToken": {
-            "description": "API token that allows access to the websocket API (beacon) and probably other APIs in the future",
+        "AuthUpdateMessage": {
+            "description": "Message that is sent to notify subscribers (e.g. Beacon) on changes to one of these authentication related values",
             "type": "object",
             "properties": {
                 "api_token": {
@@ -1125,6 +1183,10 @@
                 "expires_at": {
                     "description": "expiration date of this token",
                     "type": "string"
+                },
+                "permanent": {
+                    "description": "no expiration (ignore ExpiresAt)",
+                    "type": "boolean"
                 },
                 "roles": {
                     "description": "roles associated with this token",
@@ -1266,6 +1328,33 @@
                 }
             }
         },
+        "Token": {
+            "description": "API token that allows access to the websocket API (beacon) and probably other APIs in the future",
+            "type": "object",
+            "properties": {
+                "api_token": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "description": "ISO 8601 datetime",
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "description": "id (primary key)",
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "description": "ISO 8601 datetime",
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/User"
+                }
+            }
+        },
         "UpdateRegistrationKeyPayload": {
             "type": "object",
             "properties": {
@@ -1284,6 +1373,9 @@
             "description": "User account information including username, email, last login date and time, permanent API token flag, registration key (if user registered with a key) and roles",
             "type": "object",
             "properties": {
+                "api_token": {
+                    "$ref": "#/definitions/Token"
+                },
                 "created_at": {
                     "description": "ISO 8601 datetime",
                     "type": "string"
@@ -1324,6 +1416,18 @@
                 },
                 "username": {
                     "description": "must be unique",
+                    "type": "string"
+                }
+            }
+        },
+        "UserUpdateMessage": {
+            "description": "Message that is sent to notify subscribers (e.g. Beacon) when a new user is created or a user is removed",
+            "type": "object",
+            "properties": {
+                "removed": {
+                    "type": "boolean"
+                },
+                "username": {
                     "type": "string"
                 }
             }
