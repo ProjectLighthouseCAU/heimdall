@@ -30,8 +30,8 @@ func setupTestDatabase(db *gorm.DB, store *session.Store, userService service.Us
 
 	log.Println("		Creating test data")
 	must(registrationKeyService.Create("test_registration_key", "just for testing", true, time.Now().AddDate(0, 0, 3)))
-	must(userService.Create("Admin", "password1234", "admin@example.com", false))
-	must(userService.Create("Live", "password1234", "live@example.com", true))
+	must(userService.Create("Admin", "password1234", "admin@example.com"))
+	must(userService.Create("Live", "password1234", "live@example.com"))
 	_, err := userService.Register("User", "password1234", "user@example.com", "test_registration_key", nil)
 	must(err)
 	must(roleService.Create("admin"))

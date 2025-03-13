@@ -46,6 +46,43 @@ func (tc *TokenHandler) Get(c *fiber.Ctx) error {
 	return c.JSON(user.ApiToken)
 }
 
+type UpdateTokenRequest struct {
+	Permanent bool `json:"permanent"`
+}
+
+// @Summary      Update a user's API token (set permanent)
+// @Description  Given a valid user id and new permanent status, sets the permanent status for the users current token
+// @Tags         Users
+// @Produce      json
+// @Param        id  path  int  true  "User ID"
+// @Success      200  {object}  model.Token
+// @Failure      400  "Bad Request"
+// @Failure      401  "Unauthorized"
+// @Failure      403  "Forbidden"
+// @Failure      404  "Not Found"
+// @Failure      500  "Internal Server Error"
+// @Router       /users/{id}/api-token [put]
+func (tc *TokenHandler) Update(c *fiber.Ctx) error {
+	c.Accepts("application/json")
+	id, _ := c.ParamsInt("id", -1)
+	if id < 0 {
+		return c.SendStatus(fiber.StatusBadRequest)
+	}
+	var payload UpdateTokenRequest
+	if err := c.BodyParser(&payload); err != nil {
+		return UnwrapAndSendError(c, model.BadRequestError{Message: "Could not parse request body", Err: err})
+	}
+	user, err := tc.userService.GetByID(uint(id))
+	if err != nil {
+		return UnwrapAndSendError(c, err)
+	}
+	err = tc.tokenService.SetPermanent(user, payload.Permanent)
+	if err != nil {
+		return UnwrapAndSendError(c, err)
+	}
+	return c.SendStatus(fiber.StatusOK)
+}
+
 // @Summary      Renew a user's API token
 // @Description  Given a valid user id, invalidates the current API token and generates a new one
 // @Tags         Users
@@ -107,7 +144,7 @@ func (tc *TokenHandler) WatchAuthChanges(c *fiber.Ctx) error {
 	}
 
 	// token is not permanent and expired
-	if !user.PermanentAPIToken && time.Now().After(user.ApiToken.ExpiresAt) {
+	if !user.ApiToken.Permanent && time.Now().After(user.ApiToken.ExpiresAt) {
 		return c.SendStatus(fiber.StatusUnauthorized)
 	}
 
@@ -120,7 +157,7 @@ func (tc *TokenHandler) WatchAuthChanges(c *fiber.Ctx) error {
 		Username:  user.Username,
 		Token:     user.ApiToken.Token,
 		ExpiresAt: user.ApiToken.ExpiresAt,
-		Permanent: user.PermanentAPIToken,
+		Permanent: user.ApiToken.Permanent,
 		Roles:     roles,
 	}
 

@@ -6,11 +6,11 @@ import "time"
 type User struct {
 	Model
 
-	Username          string     `gorm:"uniqueIndex;not null" json:"username"` // must be unique
-	Password          string     `gorm:"not null" json:"-"`                    // hashed and not serialized
-	Email             string     `json:"email"`                                // can be empty
-	LastLogin         *time.Time `json:"last_login"`                           // ISO 8601 datetime TODO: redundant with UpdatedAt but only because LastLogin is updated on login
-	PermanentAPIToken bool       `json:"permanent_api_token"`                  // if set the users API token never automatically expires
+	Username  string     `gorm:"uniqueIndex;not null" json:"username"` // must be unique
+	Password  string     `gorm:"not null" json:"-"`                    // hashed and not serialized
+	Email     string     `json:"email"`                                // can be empty
+	LastLogin *time.Time `json:"last_login"`                           // ISO 8601 datetime TODO: redundant with UpdatedAt but only because LastLogin is updated on login
+	// PermanentAPIToken bool       `json:"permanent_api_token"`                  // if set the users API token never automatically expires
 
 	RegistrationKeyID *uint            `gorm:"constraint:OnDelete:SET NULL" json:"-"`
 	RegistrationKey   *RegistrationKey `gorm:"constraint:OnDelete:SET NULL" json:"registration_key,omitempty"` // omitted if null (when user was created and not registered or when list of users is queried to not leak other users keys)

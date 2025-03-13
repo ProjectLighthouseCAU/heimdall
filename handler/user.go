@@ -174,10 +174,9 @@ func (uc *UserHandler) Register(c *fiber.Ctx) error {
 }
 
 type CreateOrUpdateUserPayload struct {
-	Username          string `json:"username"`
-	Password          string `json:"password"`
-	Email             string `json:"email"`
-	PermamentAPIToken bool   `json:"permanent_api_token"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Email    string `json:"email"`
 } //@name CreateOrUpdateUserPayload
 
 // @Summary      Create user
@@ -185,7 +184,7 @@ type CreateOrUpdateUserPayload struct {
 // @Tags         Users
 // @Accept       json
 // @Produce      plain
-// @Param        payload  body  CreateOrUpdateUserPayload  true  "Username, Password, Email, PermanentAPIToken"
+// @Param        payload  body  CreateOrUpdateUserPayload  true  "Username, Password, Email"
 // @Success      201  "Created"
 // @Failure      400  "Bad Request"
 // @Failure      401  "Unauthorized"
@@ -200,7 +199,7 @@ func (uc *UserHandler) Create(c *fiber.Ctx) error {
 		return UnwrapAndSendError(c, model.BadRequestError{Message: "Could not parse request body", Err: err})
 	}
 
-	err := uc.userService.Create(payload.Username, payload.Password, payload.Email, payload.PermamentAPIToken)
+	err := uc.userService.Create(payload.Username, payload.Password, payload.Email)
 	if err != nil {
 		return UnwrapAndSendError(c, err)
 	}
@@ -213,7 +212,7 @@ func (uc *UserHandler) Create(c *fiber.Ctx) error {
 // @Accept       json
 // @Produce      plain
 // @Param        id  path  int  true  "User ID"
-// @Param        payload  body  CreateOrUpdateUserPayload  true  "Username, Password, Email, PermanentAPIToken"
+// @Param        payload  body  CreateOrUpdateUserPayload  true  "Username, Password, Email"
 // @Success      200  "OK"
 // @Failure      400  "Bad Request"
 // @Failure      401  "Unauthorized"
@@ -233,7 +232,7 @@ func (uc *UserHandler) Update(c *fiber.Ctx) error {
 		return UnwrapAndSendError(c, model.BadRequestError{Message: "Could not parse request body", Err: err})
 	}
 
-	err := uc.userService.Update(uint(id), payload.Username, payload.Password, payload.Email, payload.PermamentAPIToken)
+	err := uc.userService.Update(uint(id), payload.Username, payload.Password, payload.Email)
 	if err != nil {
 		return UnwrapAndSendError(c, err)
 	}

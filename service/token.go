@@ -43,12 +43,29 @@ func newRandomToken() (string, error) {
 	return s, nil
 }
 
+func (ts *TokenService) SetPermanent(user *model.User, permanent bool) error {
+	token, err := ts.tokenRepository.FindByID(user.ID)
+	if err != nil {
+		return err
+	}
+	token.Permanent = permanent
+	err = ts.tokenRepository.Save(token)
+	if err != nil {
+		return err
+	}
+	user, err = ts.userRepository.FindByID(user.ID)
+	if err != nil {
+		return err
+	}
+	return ts.NotifyRoleUpdate(user) // also updates the permanent status
+}
+
 // Generates a new API token for a user if the user does not have an API token (or expired)
 // the given user must have its roles and api token field pre-loaded from the database before calling
 // Returns true if the token was generated
 func (ts *TokenService) GenerateApiTokenIfNotExists(user *model.User) (bool, error) {
 	token := user.ApiToken
-	if token != nil && (user.PermanentAPIToken || token.ExpiresAt.After(time.Now())) {
+	if token != nil && (token.Permanent || token.ExpiresAt.After(time.Now())) {
 		return false, nil
 	}
 	newToken, err := newRandomToken()
@@ -82,7 +99,7 @@ func (ts *TokenService) GenerateApiTokenIfNotExists(user *model.User) (bool, err
 			Username:  user.Username,
 			Token:     token.Token,
 			ExpiresAt: token.ExpiresAt,
-			Permanent: user.PermanentAPIToken,
+			Permanent: token.Permanent,
 			Roles:     roles,
 		}
 	}
@@ -92,9 +109,9 @@ func (ts *TokenService) GenerateApiTokenIfNotExists(user *model.User) (bool, err
 func (ts *TokenService) NotifyUsernameInvalid(user *model.User) {
 	token := user.ApiToken
 	if token != nil {
-		err := ts.tokenRepository.DeleteByID(token.ID)
+		err := ts.tokenRepository.DeleteByID(user.ID)
 		if err != nil {
-			log.Println("NotifyUsernameInvalid: could not delete token with id", token.ID, ":", err)
+			log.Println("NotifyUsernameInvalid: could not delete token with user_id", user.ID, ":", err)
 		}
 	}
 
@@ -134,7 +151,7 @@ func (ts *TokenService) NotifyRoleUpdate(user *model.User) error {
 			Username:  user.Username,
 			Token:     token.Token,
 			ExpiresAt: token.ExpiresAt,
-			Permanent: user.PermanentAPIToken,
+			Permanent: token.Permanent,
 			Roles:     roles,
 		}
 	}

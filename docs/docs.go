@@ -874,7 +874,7 @@ const docTemplate = `{
                 "summary": "Create user",
                 "parameters": [
                     {
-                        "description": "Username, Password, Email, PermanentAPIToken",
+                        "description": "Username, Password, Email",
                         "name": "payload",
                         "in": "body",
                         "required": true,
@@ -970,7 +970,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Username, Password, Email, PermanentAPIToken",
+                        "description": "Username, Password, Email",
                         "name": "payload",
                         "in": "body",
                         "required": true,
@@ -1053,6 +1053,48 @@ const docTemplate = `{
                     "Users"
                 ],
                 "summary": "Get a user's API token",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Token"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "description": "Not Found"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            },
+            "put": {
+                "description": "Given a valid user id and new permanent status, sets the permanent status for the users current token",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Update a user's API token (set permanent)",
                 "parameters": [
                     {
                         "type": "integer",
@@ -1224,9 +1266,6 @@ const docTemplate = `{
                 "password": {
                     "type": "string"
                 },
-                "permanent_api_token": {
-                    "type": "boolean"
-                },
                 "username": {
                     "type": "string"
                 }
@@ -1348,9 +1387,8 @@ const docTemplate = `{
                 "expires_at": {
                     "type": "string"
                 },
-                "id": {
-                    "description": "id (primary key)",
-                    "type": "integer"
+                "permanent": {
+                    "type": "boolean"
                 },
                 "updated_at": {
                     "description": "ISO 8601 datetime",
@@ -1397,10 +1435,6 @@ const docTemplate = `{
                 "last_login": {
                     "description": "ISO 8601 datetime TODO: redundant with UpdatedAt but only because LastLogin is updated on login",
                     "type": "string"
-                },
-                "permanent_api_token": {
-                    "description": "if set the users API token never automatically expires",
-                    "type": "boolean"
                 },
                 "registration_key": {
                     "description": "omitted if null (when user was created and not registered or when list of users is queried to not leak other users keys)",

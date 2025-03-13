@@ -22,13 +22,13 @@ func (r *TokenRepository) Save(token *model.Token) error {
 
 func (r *TokenRepository) FindAll() ([]model.Token, error) {
 	var tokens []model.Token
-	err := r.DB.Preload("Users").Find(&tokens).Order("id ASC").Error
+	err := r.DB.Preload("Users").Find(&tokens).Order("user_id ASC").Error
 	return tokens, wrapError(err)
 }
 
 func (r *TokenRepository) FindByID(id uint) (*model.Token, error) {
 	var token model.Token
-	err := r.DB.Preload(clause.Associations).First(&token, id).Error
+	err := r.DB.Preload(clause.Associations).First(&token, "user_id = ?", id).Error
 	return &token, wrapError(err)
 }
 
@@ -40,7 +40,7 @@ func (r *TokenRepository) FindByToken(token string) (*model.Token, error) {
 
 func (r *TokenRepository) ExistsByID(id uint) (bool, error) {
 	var exists bool
-	err := r.DB.Model(model.Token{}).Select("count(1) > 0").Where("id = ?", id).Find(&exists).Error
+	err := r.DB.Model(model.Token{}).Select("count(1) > 0").Where("user_id = ?", id).Find(&exists).Error
 	return exists, wrapError(err)
 }
 
@@ -51,7 +51,7 @@ func (r *TokenRepository) ExistsByToken(token string) (bool, error) {
 }
 
 func (r *TokenRepository) DeleteByID(id uint) error {
-	return wrapError(r.DB.Unscoped().Select(clause.Associations).Delete(&model.Token{Model: model.Model{ID: id}}).Error)
+	return wrapError(r.DB.Unscoped().Select(clause.Associations).Delete(&model.Token{UserID: id}).Error)
 }
 
 func (r *TokenRepository) Migrate() error {

@@ -75,6 +75,8 @@ TODO | maybe | overhaul registration key prefix and generation
 TODO | important | document config options (maybe collect them in the config.go file instead of scattered around the codebase)
 TODO | important | make rate limiter configurable
 TODO | maybe | better README ;-)
+TODO | important | notify other projects about API changes (user - removed permanent_api_token, added endpoint PUT /users/{id}/api-token with JSON payload {"permanent": true/false} accessible to admins)
+
 NO | important | use transactions for redis and maybe postgres
 NO | maybe | remove redundant timestamp from user table (LastLogin and UpdatedAt are nearly identical, but UpdatedAt only changes because LastLogin is updated :D) -> however when an admin updates a user that hasn't logged in for a while, the field makes sense
 NO | maybe | find out why gorm does not load associations (joins)

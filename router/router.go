@@ -156,7 +156,7 @@ func (r *Router) Init(sessionStore *session.Store, readynessProbe func(*fiber.Ct
 	r.app.Get("/metrics", r.sessionMiddleware.AllowRole(admin), monitor.New())
 
 	// setup pprof monitoring middleware
-	r.app.Use(r.sessionMiddleware.AllowRole(admin), pprof.New())
+	r.app.Use("/debug/pprof", r.sessionMiddleware.AllowRole(admin), pprof.New())
 
 	r.app.Post("/logout", r.userHandler.Logout)
 	r.initUserRoutes(r.app.Group("/users"))
@@ -171,8 +171,8 @@ func (r *Router) Init(sessionStore *session.Store, readynessProbe func(*fiber.Ct
 
 func (r *Router) initInternalRoutes(internal fiber.Router) {
 	internal.Use(middleware.AllowLoopbackAndPrivateIPsAnd(config.InternalIPs))
-	internal.Use((fiber.Handler)(r.tokenMiddleware), r.tokenMiddleware.AllowRole(deploy))
-	internal.Get("/users", r.tokenHandler.GetUsernames)
+	internal.Use((fiber.Handler)(r.tokenMiddleware))
+	internal.Get("/users", r.tokenMiddleware.AllowRole(deploy), r.tokenHandler.GetUsernames)
 	internal.Get("/authenticate/:username<string>", r.tokenHandler.WatchAuthChanges)
 }
 
@@ -184,6 +184,7 @@ func (r *Router) initUserRoutes(users fiber.Router) {
 	users.Delete("/:id<int>", r.sessionMiddleware.AllowRoleOrOwnUserId(admin, "id"), r.userHandler.Delete)
 	users.Get("/:id<int>/roles", r.sessionMiddleware.AllowRoleOrOwnUserId(admin, "id"), r.userHandler.GetRolesOfUser)
 	users.Get("/:id/api-token", r.sessionMiddleware.AllowRoleOrOwnUserId(admin, "id"), r.tokenHandler.Get)
+	users.Put("/:id/api-token", r.sessionMiddleware.AllowRole(admin), r.tokenHandler.Update)                     // set permanent
 	users.Delete("/:id/api-token", r.sessionMiddleware.AllowRoleOrOwnUserId(admin, "id"), r.tokenHandler.Delete) // invalidate and renew token
 }
 

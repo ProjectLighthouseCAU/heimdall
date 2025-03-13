@@ -4,10 +4,12 @@ import "time"
 
 // @Description API token that allows access to the websocket API (beacon) and probably other APIs in the future
 type Token struct {
-	Model               // IssuedAt = CreatedAt (from Model)
+	UserID    uint      `gorm:"primarykey;constraint:OnDelete:SET NULL;not null" json:"-"`
 	Token     string    `gorm:"uniqueIndex;not null" json:"api_token"`
+	Permanent bool      `json:"permanent"`
+	CreatedAt time.Time `json:"created_at"` // ISO 8601 datetime
+	UpdatedAt time.Time `json:"updated_at"` // ISO 8601 datetime
 	ExpiresAt time.Time `gorm:"not null" json:"expires_at"`
-	UserID    uint      `gorm:"constraint:OnDelete:SET NULL;not null" json:"-"`
 	User      *User     `gorm:"constraint:OnDelete:SET NULL;not null" json:"user,omitempty"`
 } //@name Token
 

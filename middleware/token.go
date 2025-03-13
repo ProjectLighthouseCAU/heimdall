@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"log"
 	"slices"
 
 	"github.com/ProjectLighthouseCAU/heimdall/model"
@@ -17,18 +16,15 @@ func NewTokenMiddleware(userService *service.UserService, tokenRepository *repos
 		headers := c.GetReqHeaders()
 		authHeader := headers["Authorization"]
 		if len(authHeader) == 0 || authHeader[0] == "" {
-			log.Println("authHeader empty")
 			return fiber.ErrUnauthorized
 		}
 		// TODO: figure out how joins work with Gorm and query the user by token
 		token, err := tokenRepository.FindByToken(authHeader[0])
 		if err != nil {
-			log.Println(err)
 			return fiber.ErrUnauthorized
 		}
 		user, err := userService.GetByID(token.UserID)
 		if err != nil {
-			log.Println(err)
 			return fiber.ErrUnauthorized
 		}
 		c.Locals("user", user)

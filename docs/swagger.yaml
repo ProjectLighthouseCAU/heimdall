@@ -33,8 +33,6 @@ definitions:
         type: string
       password:
         type: string
-      permanent_api_token:
-        type: boolean
       username:
         type: string
     type: object
@@ -121,9 +119,8 @@ definitions:
         type: string
       expires_at:
         type: string
-      id:
-        description: id (primary key)
-        type: integer
+      permanent:
+        type: boolean
       updated_at:
         description: ISO 8601 datetime
         type: string
@@ -159,9 +156,6 @@ definitions:
         description: 'ISO 8601 datetime TODO: redundant with UpdatedAt but only because
           LastLogin is updated on login'
         type: string
-      permanent_api_token:
-        description: if set the users API token never automatically expires
-        type: boolean
       registration_key:
         allOf:
         - $ref: '#/definitions/RegistrationKey'
@@ -768,7 +762,7 @@ paths:
       - application/json
       description: Creates a new user
       parameters:
-      - description: Username, Password, Email, PermanentAPIToken
+      - description: Username, Password, Email
         in: body
         name: payload
         required: true
@@ -859,7 +853,7 @@ paths:
         name: id
         required: true
         type: integer
-      - description: Username, Password, Email, PermanentAPIToken
+      - description: Username, Password, Email
         in: body
         name: payload
         required: true
@@ -942,6 +936,35 @@ paths:
         "500":
           description: Internal Server Error
       summary: Get a user's API token
+      tags:
+      - Users
+    put:
+      description: Given a valid user id and new permanent status, sets the permanent
+        status for the users current token
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Token'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Update a user's API token (set permanent)
       tags:
       - Users
   /users/{id}/roles:

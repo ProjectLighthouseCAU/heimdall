@@ -165,7 +165,7 @@ func (s *UserService) Register(username, password, email, registrationKey string
 	return savedUser, nil
 }
 
-func (s *UserService) Create(username, password, email string, permanentAPIToken bool) error {
+func (s *UserService) Create(username, password, email string) error {
 	if err := validateUser(username, password, email); err != nil {
 		return err
 	}
@@ -177,11 +177,10 @@ func (s *UserService) Create(username, password, email string, permanentAPIToken
 		return model.InternalServerError{Message: "could not hash password", Err: err}
 	}
 	user := model.User{
-		Username:          username,
-		Password:          string(hashedPassword),
-		Email:             email,
-		LastLogin:         nil,
-		PermanentAPIToken: permanentAPIToken,
+		Username:  username,
+		Password:  string(hashedPassword),
+		Email:     email,
+		LastLogin: nil,
 	}
 
 	err = s.userRepository.Save(&user)
@@ -192,7 +191,7 @@ func (s *UserService) Create(username, password, email string, permanentAPIToken
 	return nil
 }
 
-func (s *UserService) Update(id uint, username, password, email string, permanentAPIToken bool) error {
+func (s *UserService) Update(id uint, username, password, email string) error {
 	user, err := s.userRepository.FindByID(id)
 	if err != nil {
 		return err
@@ -208,11 +207,10 @@ func (s *UserService) Update(id uint, username, password, email string, permanen
 	}
 	regenerateApiTokenAfterUpdate := false
 	previousUser := *user
-	if username != user.Username || user.PermanentAPIToken != permanentAPIToken {
+	if username != user.Username {
 		regenerateApiTokenAfterUpdate = true
 		previousUser = *user // copy user before update
 		user.Username = username
-		user.PermanentAPIToken = permanentAPIToken
 		// TODO: maybe keep list of previous names?
 	}
 	if password != "" && !crypto.PasswordMatchesHash(password, user.Password) {
