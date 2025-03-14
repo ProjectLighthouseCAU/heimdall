@@ -54,7 +54,7 @@ func TestGetRoleById(t *testing.T) {
 }
 
 func TestGetRoleByIdThatDoesNotExist(t *testing.T) {
-	req, err := http.NewRequest("GET", URL+"/roles/2", nil)
+	req, err := http.NewRequest("GET", URL+"/roles/3", nil)
 	checkError(t, err)
 
 	resp := RunRequest(t, req)
@@ -98,19 +98,6 @@ func TestUpdateRole(t *testing.T) {
 	}
 }
 
-func TestDeleteRole(t *testing.T) {
-	req1, err := http.NewRequest("DELETE", URL+"/roles/2", nil)
-	checkError(t, err)
-
-	// check if role exists
-	req2, err := http.NewRequest("GET", URL+"/roles/2", nil)
-	checkError(t, err)
-
-	resps := RunMultiRequest(t, req1, req2)
-	expect2xxStatus(t, resps[0])
-	expect404Status(t, resps[1])
-}
-
 func TestGetUsersOfRole(t *testing.T) {
 	req, err := http.NewRequest("GET", URL+"/roles/1/users", nil)
 	checkError(t, err)
@@ -124,7 +111,7 @@ func TestGetUsersOfRole(t *testing.T) {
 }
 
 func TestAddUserToRole(t *testing.T) {
-	req1, err := http.NewRequest("PUT", URL+"/roles/2/users/2", nil)
+	req1, err := http.NewRequest("PUT", URL+"/roles/2/users/3", nil)
 	checkError(t, err)
 
 	req2, err := http.NewRequest("GET", URL+"/roles/2/users", nil)
@@ -144,10 +131,10 @@ func TestAddUserToRole(t *testing.T) {
 }
 
 func TestRemoveUserFromRole(t *testing.T) {
-	req1, err := http.NewRequest("PUT", URL+"/roles/2/users/2", nil)
+	req1, err := http.NewRequest("PUT", URL+"/roles/2/users/3", nil)
 	checkError(t, err)
 
-	req2, err := http.NewRequest("DELETE", URL+"/roles/2/users/2", nil)
+	req2, err := http.NewRequest("DELETE", URL+"/roles/2/users/3", nil)
 	checkError(t, err)
 
 	req3, err := http.NewRequest("GET", URL+"/roles/2/users", nil)
@@ -165,4 +152,17 @@ func TestRemoveUserFromRole(t *testing.T) {
 	}) {
 		t.Fatalf("Role contains added user \"User\" after removal, users: %+v", users)
 	}
+}
+
+func TestDeleteRole(t *testing.T) {
+	req1, err := http.NewRequest("DELETE", URL+"/roles/2", nil)
+	checkError(t, err)
+
+	// check if role exists
+	req2, err := http.NewRequest("GET", URL+"/roles/2", nil)
+	checkError(t, err)
+
+	resps := RunMultiRequest(t, req1, req2)
+	expect2xxStatus(t, resps[0])
+	expect404Status(t, resps[1])
 }

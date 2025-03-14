@@ -160,7 +160,7 @@ func setupApplication(app *fiber.App, db *gorm.DB, store *session.Store) {
 	printRoutes(routa.ListRoutes())
 
 	if config.UseTestDatabase { // TODO: remove in prod - this function deletes the whole database
-		setupTestDatabase(db, store, userService, roleService, registrationKeyService)
+		SetupTestDatabase(db, store, userService, roleService, registrationKeyService, tokenService)
 	}
 }
 

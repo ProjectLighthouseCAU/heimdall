@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ProjectLighthouseCAU/heimdall/config"
 	"github.com/ProjectLighthouseCAU/heimdall/handler"
 	"github.com/ProjectLighthouseCAU/heimdall/setup"
 	"github.com/gofiber/fiber/v2"
@@ -78,6 +79,7 @@ func login(t *testing.T, app *fiber.App) string {
 
 func RunRequest(t *testing.T, req *http.Request) *http.Response {
 	// start := time.Now()
+	config.UseTestDatabase = true
 	app := setup.Setup()
 	// t.Logf("Setup time: %v", time.Since(start))
 	cookie := login(t, app)
@@ -92,6 +94,7 @@ func RunRequest(t *testing.T, req *http.Request) *http.Response {
 }
 
 func RunMultiRequest(t *testing.T, reqs ...*http.Request) []*http.Response {
+	config.UseTestDatabase = true
 	app := setup.Setup()
 	cookie := login(t, app)
 	resps := make([]*http.Response, len(reqs))
