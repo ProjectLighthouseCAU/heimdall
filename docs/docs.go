@@ -22,7 +22,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Auth (internal)"
+                    "Internal"
                 ],
                 "summary": "Get and subscribe to updates of a user's api token and roles",
                 "responses": {
@@ -51,7 +51,7 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Auth (internal)"
+                    "Internal"
                 ],
                 "summary": "Get a list of all usernames",
                 "responses": {
@@ -1385,17 +1385,16 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "expires_at": {
+                    "description": "ISO 8601 datetime",
                     "type": "string"
                 },
                 "permanent": {
+                    "description": "if permanent is true, expires_at is ignored",
                     "type": "boolean"
                 },
                 "updated_at": {
                     "description": "ISO 8601 datetime",
                     "type": "string"
-                },
-                "user": {
-                    "$ref": "#/definitions/User"
                 }
             }
         },
@@ -1418,7 +1417,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "api_token": {
-                    "$ref": "#/definitions/Token"
+                    "description": "omitted if null (user doesn't have an API token)",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/Token"
+                        }
+                    ]
                 },
                 "created_at": {
                     "description": "ISO 8601 datetime",
@@ -1433,7 +1437,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "last_login": {
-                    "description": "ISO 8601 datetime TODO: redundant with UpdatedAt but only because LastLogin is updated on login",
+                    "description": "ISO 8601 datetime",
                     "type": "string"
                 },
                 "registration_key": {

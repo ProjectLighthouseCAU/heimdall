@@ -118,14 +118,14 @@ definitions:
         description: ISO 8601 datetime
         type: string
       expires_at:
+        description: ISO 8601 datetime
         type: string
       permanent:
+        description: if permanent is true, expires_at is ignored
         type: boolean
       updated_at:
         description: ISO 8601 datetime
         type: string
-      user:
-        $ref: '#/definitions/User'
     type: object
   UpdateRegistrationKeyPayload:
     properties:
@@ -142,7 +142,9 @@ definitions:
       a key) and roles
     properties:
       api_token:
-        $ref: '#/definitions/Token'
+        allOf:
+        - $ref: '#/definitions/Token'
+        description: omitted if null (user doesn't have an API token)
       created_at:
         description: ISO 8601 datetime
         type: string
@@ -153,8 +155,7 @@ definitions:
         description: id (primary key)
         type: integer
       last_login:
-        description: 'ISO 8601 datetime TODO: redundant with UpdatedAt but only because
-          LastLogin is updated on login'
+        description: ISO 8601 datetime
         type: string
       registration_key:
         allOf:
@@ -209,7 +210,7 @@ paths:
           description: Internal Server Error
       summary: Get and subscribe to updates of a user's api token and roles
       tags:
-      - Auth (internal)
+      - Internal
   /internal/users:
     get:
       description: Returns a list of all users names
@@ -228,7 +229,7 @@ paths:
           description: Internal Server Error
       summary: Get a list of all usernames
       tags:
-      - Auth (internal)
+      - Internal
   /login:
     post:
       consumes:
