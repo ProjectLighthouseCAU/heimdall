@@ -60,9 +60,9 @@ func Setup() *fiber.App {
 		Expiration:     24 * time.Hour,
 		KeyLookup:      "cookie:session_id",
 		KeyGenerator:   utils.UUIDv4,
-		CookieSecure:   false,  // TODO: change to true in production
-		CookieSameSite: "None", // TODO: change to Lax or Strict in production
-		CookieHTTPOnly: false,  // TODO: change to true in production
+		CookieSecure:   true,
+		CookieSameSite: "Lax",
+		CookieHTTPOnly: true,
 	})
 
 	setupApplication(app, db, sessionStore)
