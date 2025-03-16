@@ -3,7 +3,6 @@ package handler
 import (
 	"bufio"
 	"encoding/json"
-	"log"
 	"time"
 
 	"github.com/ProjectLighthouseCAU/heimdall/model"
@@ -189,8 +188,6 @@ func (tc *TokenHandler) GetUsernames(c *fiber.Ctx) error {
 	c.Set("Cache-Control", "no-cache")
 	c.Set("Connection", "keep-alive")
 	c.Set("Transfer-Encoding", "chunked")
-
-	log.Println("GET USERNAMES")
 
 	users, err := tc.userService.GetAll()
 	if err != nil {
