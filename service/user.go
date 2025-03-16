@@ -36,13 +36,23 @@ func (s *UserService) GetByName(name string) (*model.User, error) {
 }
 
 func (s *UserService) Login(username, password string, session *session.Session) (*model.User, error) {
-	userid := session.Get("userid")
-	if userid != nil { // already logged in
-		uid, ok := userid.(uint)
-		if !ok {
-			return nil, model.InternalServerError{Message: "Error retrieving userid from session"}
+	uid, uidOk := session.Get("userid").(uint)
+	sessionUsername, usernameOk := session.Get("username").(string)
+	sessionPassword, passwordOk := session.Get("password").(string)
+
+	if uidOk && usernameOk && passwordOk { // already logged in
+		user, err := s.userRepository.FindByID(uid)
+		if err == nil { // user exists
+			if sessionUsername == user.Username && sessionPassword == user.Password { // username and password weren't changed
+				return user, nil // user already logged in and still authenticated
+			}
 		}
-		return s.userRepository.FindByID(uid)
+		// user was deleted or changed username or password
+		if err := session.Destroy(); err != nil {
+			return nil, model.InternalServerError{Message: "Could not destroy session", Err: err}
+		}
+		// continue with login
+		// NOTE: we can use the session after session.Destroy() as a new empty session
 	}
 	user, err := s.userRepository.FindByName(username)
 	// don't leak if username exists -> both cases return the same response
@@ -54,15 +64,15 @@ func (s *UserService) Login(username, password string, session *session.Session)
 	}
 
 	session.Set("userid", user.ID)
-	err = session.Save()
-	if err != nil {
+	session.Set("username", user.Username)
+	session.Set("password", user.Password)
+	if err = session.Save(); err != nil {
 		return nil, model.InternalServerError{Message: "Could not save session", Err: err}
 	}
 
 	now := time.Now()
 	user.LastLogin = &now
-	err = s.userRepository.Save(user)
-	if err != nil {
+	if err = s.userRepository.Save(user); err != nil {
 		return nil, model.InternalServerError{Message: "Could not save user", Err: err}
 	}
 	tokenWasGenerated, err := s.tokenService.GenerateApiTokenIfNotExists(user)
@@ -111,6 +121,11 @@ func (s *UserService) checkIfUserExists(username string) error {
 }
 
 func (s *UserService) Register(username, password, email, registrationKey string, session *session.Session) (*model.User, error) {
+	if session != nil { // session is only nil when Register is called from setupTestDatabase
+		if _, ok := session.Get("userid").(uint); ok {
+			return nil, model.BadRequestError{Message: "You cannot register when you are logged in!"}
+		}
+	}
 	key, err := s.registrationKeyRepository.FindByKey(registrationKey)
 	if err != nil {
 		switch err.(type) {
@@ -142,24 +157,24 @@ func (s *UserService) Register(username, password, email, registrationKey string
 		LastLogin:       &now,
 		RegistrationKey: key,
 	}
-	err = s.userRepository.Save(&user)
-	if err != nil {
+	if err := s.userRepository.Save(&user); err != nil {
 		return nil, err
 	}
 	savedUser, err := s.userRepository.FindByName(user.Username)
 	if err != nil {
 		return nil, err
 	}
-	if session != nil {
+	if session != nil { // session is only nil when Register is called from setupTestDatabase
 		session.Set("userid", savedUser.ID)
-		err = session.Save()
-		if err != nil {
+		session.Set("username", savedUser.Username)
+		session.Set("password", savedUser.Password)
+		if err := session.Save(); err != nil {
 			return nil, model.InternalServerError{Message: "could not save session", Err: err}
 		}
 	}
+
 	s.tokenService.NotifyUserCreated(savedUser)
-	_, err = s.tokenService.GenerateApiTokenIfNotExists(savedUser)
-	if err != nil {
+	if _, err := s.tokenService.GenerateApiTokenIfNotExists(savedUser); err != nil {
 		return nil, err
 	}
 	return savedUser, nil
@@ -183,8 +198,7 @@ func (s *UserService) Create(username, password, email string) error {
 		LastLogin: nil,
 	}
 
-	err = s.userRepository.Save(&user)
-	if err != nil {
+	if err = s.userRepository.Save(&user); err != nil {
 		return err
 	}
 	s.tokenService.NotifyUserCreated(&user)
@@ -222,8 +236,7 @@ func (s *UserService) Update(id uint, username, password, email string) error {
 		user.Password = string(hashedPassword)
 	}
 	user.Email = email
-	err = s.userRepository.Save(user)
-	if err != nil {
+	if err = s.userRepository.Save(user); err != nil {
 		return err
 	}
 	if regenerateApiTokenAfterUpdate {
@@ -241,14 +254,14 @@ func (s *UserService) DeleteByID(id uint) error {
 		return model.NotFoundError{Err: err}
 	}
 
-	// session.Destroy() // TODO: destroy all sessions of the deleted user, not this one!
-
-	err = s.userRepository.DeleteByID(id)
-	if err != nil {
+	if err = s.userRepository.DeleteByID(id); err != nil {
 		return err
 	}
 	s.tokenService.NotifyUsernameInvalid(user)
 	s.tokenService.NotifyUserDeleted(user)
+	// NOTE: We do not need to destroy the deleted user's session
+	// since the session middleware checks if the user exists.
+	// The session is destroyed when it is used after the user was deleted.
 	return nil
 }
 
