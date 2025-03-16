@@ -242,7 +242,9 @@ func (s *UserService) Update(id uint, username, password, email string) error {
 	if regenerateApiTokenAfterUpdate {
 		s.tokenService.NotifyUsernameInvalid(&previousUser)
 		_, _ = s.tokenService.GenerateApiTokenIfNotExists(user)
-		// TODO: destroy all (other) sessions of the user
+		// NOTE: We do not need to destroy the deleted user's sessions
+		// since the session middleware checks if the username or password was changed.
+		// The session is destroyed when it is used after the username or password was changed.
 	}
 	return nil
 }
@@ -259,7 +261,7 @@ func (s *UserService) DeleteByID(id uint) error {
 	}
 	s.tokenService.NotifyUsernameInvalid(user)
 	s.tokenService.NotifyUserDeleted(user)
-	// NOTE: We do not need to destroy the deleted user's session
+	// NOTE: We do not need to destroy the deleted user's sessions
 	// since the session middleware checks if the user exists.
 	// The session is destroyed when it is used after the user was deleted.
 	return nil
