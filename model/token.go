@@ -6,11 +6,10 @@ import "time"
 type Token struct {
 	UserID    uint      `gorm:"primarykey;constraint:OnDelete:SET NULL;not null" json:"-"`
 	Token     string    `gorm:"uniqueIndex;not null" json:"api_token"`
-	Permanent bool      `json:"permanent"`
-	CreatedAt time.Time `json:"created_at"` // ISO 8601 datetime
-	UpdatedAt time.Time `json:"updated_at"` // ISO 8601 datetime
-	ExpiresAt time.Time `gorm:"not null" json:"expires_at"`
-	User      *User     `gorm:"constraint:OnDelete:SET NULL;not null" json:"user,omitempty"`
+	Permanent bool      `json:"permanent"`                  // if permanent is true, expires_at is ignored
+	CreatedAt time.Time `json:"created_at"`                 // ISO 8601 datetime
+	UpdatedAt time.Time `json:"updated_at"`                 // ISO 8601 datetime
+	ExpiresAt time.Time `gorm:"not null" json:"expires_at"` // ISO 8601 datetime
 } //@name Token
 
 // @Description Message that is sent to notify subscribers (e.g. Beacon) on changes to one of these authentication related values

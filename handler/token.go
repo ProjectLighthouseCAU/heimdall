@@ -121,7 +121,7 @@ var keepalive = []byte{'\r', '\n'} // keepalive message (just newline without co
 
 // @Summary      Get and subscribe to updates of a user's api token and roles
 // @Description  If the initial request was successful, the connection is kept alive and updates are sent using server sent events (SSE).
-// @Tags         Auth (internal)
+// @Tags         Internal
 // @Produce      json
 // @Success      200  {object} AuthUpdateMessage
 // @Failure      400  "Bad Request"
@@ -178,7 +178,7 @@ func (tc *TokenHandler) WatchAuthChanges(c *fiber.Ctx) error {
 
 // @Summary      Get a list of all usernames
 // @Description  Returns a list of all users names
-// @Tags         Auth (internal)
+// @Tags         Internal
 // @Produce      json
 // @Success      200  {object}  []model.UserUpdateMessage
 // @Failure      401  "Unauthorized"
