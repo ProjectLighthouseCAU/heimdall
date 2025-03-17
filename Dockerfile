@@ -36,7 +36,7 @@ RUN chmod -R +rx /app/heimdall
 
 ### RUNTIME IMAGE ###
 
-FROM scratch as runtime-stage
+FROM scratch AS runtime-stage
 # copy the user files and switch to app user
 COPY --from=compile-stage /etc/passwd /etc/passwd
 # TODO: maybe group and shadow are not needed?
