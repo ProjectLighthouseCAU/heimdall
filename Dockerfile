@@ -2,7 +2,7 @@
 
 ### BUILD IMAGE ###
 
-FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS compile-stage
+FROM --platform=$BUILDPLATFORM golang:1.24-alpine AS compile-stage
 
 # git needed by go get / go build
 RUN apk add git
