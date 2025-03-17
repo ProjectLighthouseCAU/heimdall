@@ -28,12 +28,10 @@ func Setup() *fiber.App {
 
 	log.Println("Starting Heimdall")
 	app := fiber.New(fiber.Config{
-		AppName:                 "Heimdall",
-		CaseSensitive:           true,
-		StrictRouting:           true,
-		ProxyHeader:             config.ProxyHeader,
-		EnableTrustedProxyCheck: true,
-		TrustedProxies:          []string{config.TrustedProxy},
+		AppName:       "Heimdall",
+		CaseSensitive: true,
+		StrictRouting: true,
+		ProxyHeader:   config.ProxyHeader,
 	})
 
 	// Dependency Injection
