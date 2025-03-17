@@ -15,5 +15,5 @@ type RegistrationKey struct {
 	Permanent   bool      `json:"permanent"`                       // if set, ignores the expires_at field and never expires this key
 	ExpiresAt   time.Time `json:"expires_at"`                      // expiration date in ISO 8601 datetime
 
-	Users []User `json:"-"` // users that registered with this key, not serialized
+	Users []User `gorm:"constraint:OnDelete:SET NULL" json:"-"` // users that registered with this key, not serialized
 } //@name RegistrationKey

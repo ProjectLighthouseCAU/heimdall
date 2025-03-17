@@ -65,16 +65,21 @@ STATUS: DONE, TESTING, IN-PROGRESS, TODO, NO (decided against)
 DONE | maybe | rename every occurrence of controller to handler
 DONE | important | don't return database errors, they could leak sensitive information
 DONE | important | return 401 on /register with invalid reg-key
-TESTING | important | check that the rate limiter uses the correct IP after reverse proxy
-TESTING | important | lower rate limit for routes that hash passwords to prevent easy DOS (login, register, update user, create user)
-TESTING | important | don't return plain text (bad practice), always return json e.g. {"code": 404, "message": "Not found}
+DONE | important | document config options (maybe collect them in the config.go file instead of scattered around the codebase)
+DONE | important | destroy all sessions of a user when username or password is changed or user is deleted (blocked: fiber storage cannot retrieve all sessions of a specific user_id) -> DONE: SessionMiddleware and Login check if username or password has changed or if the user does not exist anymore
+DONE | important | check that the rate limiter uses the correct IP after reverse proxy
+DONE | important | lower rate limit for routes that hash passwords to prevent easy DOS (login, register, update user, create user)
+DONE | important | don't return plain text (bad practice), always return json e.g. {"code": 404, "message": "Not found}
+DONE | important | notify other projects about API changes (user - removed permanent_api_token, added endpoint PUT /users/{id}/api-token with JSON payload {"permanent": true/false} accessible to admins)
 IN-PROGRESS | important | testing (end-to-end, unit, security)
 IN-PROGRESS | important | security (csrf, xss, sqli, cors, same-origin, csp)
 TODO | maybe | password criteria (sync with frontend)
 TODO | maybe | overhaul registration key prefix and generation
-TODO | important | document config options (maybe collect them in the config.go file instead of scattered around the codebase)
 TODO | important | make rate limiter configurable
 TODO | maybe | better README ;-)
+TODO | important | garbage collection in API-tokens table (delete expired tokens)
+TODO | maybe | use casbin middleware for access control to REST API
+
 NO | important | use transactions for redis and maybe postgres
 NO | maybe | remove redundant timestamp from user table (LastLogin and UpdatedAt are nearly identical, but UpdatedAt only changes because LastLogin is updated :D) -> however when an admin updates a user that hasn't logged in for a while, the field makes sense
 NO | maybe | find out why gorm does not load associations (joins)

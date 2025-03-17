@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/ProjectLighthouseCAU/heimdall/config"
+	"github.com/ProjectLighthouseCAU/heimdall/crypto"
 	"github.com/asaskevich/govalidator"
 )
 
@@ -19,7 +20,10 @@ func isValidPassword(str string) bool {
 	if strings.TrimSpace(str) == "" {
 		return false
 	}
-	if len(str) < config.GetInt("MIN_PASSWORD_LENGTH", 12) {
+	if len(str) < config.MinPasswordLength {
+		return false
+	}
+	if len(str) > crypto.MaxPasswordLength {
 		return false
 	}
 	// TODO: more password criteria

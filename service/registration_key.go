@@ -32,7 +32,7 @@ func (r *RegistrationKeyService) GetByKey(key string) (*model.RegistrationKey, e
 func (r *RegistrationKeyService) Create(key, description string, permanent bool, expiresAt time.Time) error {
 	if key == "" { // special case: let the server generate the key
 		var err error
-		key, err = crypto.NewRandomAlphaNumString(config.GetInt("REGISTRATION_KEY_LENGTH", 20))
+		key, err = crypto.NewRandomAlphaNumString(config.RegistrationKeyLength)
 		if err != nil {
 			return model.InternalServerError{Message: "Could not generate new registration key", Err: err}
 		}

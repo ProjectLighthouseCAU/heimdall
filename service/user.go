@@ -36,13 +36,23 @@ func (s *UserService) GetByName(name string) (*model.User, error) {
 }
 
 func (s *UserService) Login(username, password string, session *session.Session) (*model.User, error) {
-	userid := session.Get("userid")
-	if userid != nil { // already logged in
-		uid, ok := userid.(uint)
-		if !ok {
-			return nil, model.InternalServerError{Message: "Error retrieving userid from session"}
+	uid, uidOk := session.Get("userid").(uint)
+	sessionUsername, usernameOk := session.Get("username").(string)
+	sessionPassword, passwordOk := session.Get("password").(string)
+
+	if uidOk && usernameOk && passwordOk { // already logged in
+		user, err := s.userRepository.FindByID(uid)
+		if err == nil { // user exists
+			if sessionUsername == user.Username && sessionPassword == user.Password { // username and password weren't changed
+				return user, nil // user already logged in and still authenticated
+			}
 		}
-		return s.userRepository.FindByID(uid)
+		// user was deleted or changed username or password
+		if err := session.Destroy(); err != nil {
+			return nil, model.InternalServerError{Message: "Could not destroy session", Err: err}
+		}
+		// continue with login
+		// NOTE: we can use the session after session.Destroy() as a new empty session
 	}
 	user, err := s.userRepository.FindByName(username)
 	// don't leak if username exists -> both cases return the same response
@@ -54,18 +64,28 @@ func (s *UserService) Login(username, password string, session *session.Session)
 	}
 
 	session.Set("userid", user.ID)
-	err = session.Save()
-	if err != nil {
+	session.Set("username", user.Username)
+	session.Set("password", user.Password)
+	if err = session.Save(); err != nil {
 		return nil, model.InternalServerError{Message: "Could not save session", Err: err}
 	}
 
 	now := time.Now()
 	user.LastLogin = &now
-	err = s.userRepository.Save(user)
-	if err != nil {
+	if err = s.userRepository.Save(user); err != nil {
 		return nil, model.InternalServerError{Message: "Could not save user", Err: err}
 	}
-	s.tokenService.GenerateApiTokenIfNotExists(user)
+	tokenWasGenerated, err := s.tokenService.GenerateApiTokenIfNotExists(user)
+	if err != nil {
+		return nil, err
+	}
+	if tokenWasGenerated { // query user again to include generated api token
+		user, err := s.userRepository.FindByID(user.ID)
+		if err != nil {
+			return nil, model.NotFoundError{Message: "Could not find user after login - this should not happen", Err: err}
+		}
+		return user, nil
+	}
 	return user, nil
 }
 
@@ -101,6 +121,11 @@ func (s *UserService) checkIfUserExists(username string) error {
 }
 
 func (s *UserService) Register(username, password, email, registrationKey string, session *session.Session) (*model.User, error) {
+	if session != nil { // session is only nil when Register is called from setupTestDatabase
+		if _, ok := session.Get("userid").(uint); ok {
+			return nil, model.BadRequestError{Message: "You cannot register when you are logged in!"}
+		}
+	}
 	key, err := s.registrationKeyRepository.FindByKey(registrationKey)
 	if err != nil {
 		switch err.(type) {
@@ -126,32 +151,36 @@ func (s *UserService) Register(username, password, email, registrationKey string
 	}
 	now := time.Now()
 	user := model.User{
-		Username:          username,
-		Password:          string(hashedPassword),
-		Email:             email,
-		LastLogin:         &now,
-		RegistrationKeyID: &key.ID,
+		Username:        username,
+		Password:        string(hashedPassword),
+		Email:           email,
+		LastLogin:       &now,
+		RegistrationKey: key,
 	}
-	err = s.userRepository.Save(&user)
-	if err != nil {
+	if err := s.userRepository.Save(&user); err != nil {
 		return nil, err
 	}
 	savedUser, err := s.userRepository.FindByName(user.Username)
 	if err != nil {
 		return nil, err
 	}
-	if session != nil {
+	if session != nil { // session is only nil when Register is called from setupTestDatabase
 		session.Set("userid", savedUser.ID)
-		err = session.Save()
-		if err != nil {
+		session.Set("username", savedUser.Username)
+		session.Set("password", savedUser.Password)
+		if err := session.Save(); err != nil {
 			return nil, model.InternalServerError{Message: "could not save session", Err: err}
 		}
 	}
-	s.tokenService.GenerateApiTokenIfNotExists(savedUser)
+
+	s.tokenService.NotifyUserCreated(savedUser)
+	if _, err := s.tokenService.GenerateApiTokenIfNotExists(savedUser); err != nil {
+		return nil, err
+	}
 	return savedUser, nil
 }
 
-func (s *UserService) Create(username, password, email string, permanentAPIToken bool) error {
+func (s *UserService) Create(username, password, email string) error {
 	if err := validateUser(username, password, email); err != nil {
 		return err
 	}
@@ -163,16 +192,20 @@ func (s *UserService) Create(username, password, email string, permanentAPIToken
 		return model.InternalServerError{Message: "could not hash password", Err: err}
 	}
 	user := model.User{
-		Username:          username,
-		Password:          string(hashedPassword),
-		Email:             email,
-		LastLogin:         nil,
-		PermanentAPIToken: permanentAPIToken,
+		Username:  username,
+		Password:  string(hashedPassword),
+		Email:     email,
+		LastLogin: nil,
 	}
-	return s.userRepository.Save(&user)
+
+	if err = s.userRepository.Save(&user); err != nil {
+		return err
+	}
+	s.tokenService.NotifyUserCreated(&user)
+	return nil
 }
 
-func (s *UserService) Update(id uint, username, password, email string, permanentAPIToken bool) error {
+func (s *UserService) Update(id uint, username, password, email string) error {
 	user, err := s.userRepository.FindByID(id)
 	if err != nil {
 		return err
@@ -187,12 +220,11 @@ func (s *UserService) Update(id uint, username, password, email string, permanen
 		return model.BadRequestError{Message: "Invalid email"}
 	}
 	regenerateApiTokenAfterUpdate := false
-	var previousUser model.User
-	if username != user.Username || user.PermanentAPIToken != permanentAPIToken {
+	previousUser := *user
+	if username != user.Username {
 		regenerateApiTokenAfterUpdate = true
 		previousUser = *user // copy user before update
 		user.Username = username
-		user.PermanentAPIToken = permanentAPIToken
 		// TODO: maybe keep list of previous names?
 	}
 	if password != "" && !crypto.PasswordMatchesHash(password, user.Password) {
@@ -200,16 +232,19 @@ func (s *UserService) Update(id uint, username, password, email string, permanen
 		if err != nil {
 			return model.InternalServerError{Message: "could not hash password", Err: err}
 		}
+		regenerateApiTokenAfterUpdate = true
 		user.Password = string(hashedPassword)
 	}
 	user.Email = email
-	err = s.userRepository.Save(user)
-	if err != nil {
+	if err = s.userRepository.Save(user); err != nil {
 		return err
 	}
 	if regenerateApiTokenAfterUpdate {
-		_, _ = s.tokenService.InvalidateApiTokenIfExists(&previousUser)
+		s.tokenService.NotifyUsernameInvalid(&previousUser)
 		_, _ = s.tokenService.GenerateApiTokenIfNotExists(user)
+		// NOTE: We do not need to destroy the deleted user's sessions
+		// since the session middleware checks if the username or password was changed.
+		// The session is destroyed when it is used after the username or password was changed.
 	}
 	return nil
 }
@@ -220,8 +255,16 @@ func (s *UserService) DeleteByID(id uint) error {
 	if err != nil {
 		return model.NotFoundError{Err: err}
 	}
-	s.tokenService.InvalidateApiTokenIfExists(user)
-	return s.userRepository.DeleteByID(id)
+
+	if err = s.userRepository.DeleteByID(id); err != nil {
+		return err
+	}
+	s.tokenService.NotifyUsernameInvalid(user)
+	s.tokenService.NotifyUserDeleted(user)
+	// NOTE: We do not need to destroy the deleted user's sessions
+	// since the session middleware checks if the user exists.
+	// The session is destroyed when it is used after the user was deleted.
+	return nil
 }
 
 func (s *UserService) GetRolesOfUser(userid uint) ([]model.Role, error) {

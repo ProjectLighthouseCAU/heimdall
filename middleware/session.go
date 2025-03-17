@@ -10,37 +10,54 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/session"
 )
 
+type SessionMiddleware fiber.Handler
+
 func NewSessionMiddleware(sessionStore *session.Store,
 	userService service.UserService,
-	tokenService service.TokenService) fiber.Handler {
+	tokenService service.TokenService) SessionMiddleware {
 	return func(c *fiber.Ctx) error {
 		session, err := sessionStore.Get(c)
 		if err != nil {
 			return err
 		}
-		userIdIntf := session.Get("userid")
-		if userIdIntf == nil {
+		userId, ok := session.Get("userid").(uint)
+		if !ok {
 			return handler.UnwrapAndSendError(c, model.UnauthorizedError{})
 		}
-		userId, ok := userIdIntf.(uint)
-		if !ok {
-			return handler.UnwrapAndSendError(c, model.InternalServerError{})
-		}
+
 		user, err := userService.GetByID(userId)
-		if err != nil {
-			err := session.Destroy()
-			if err != nil {
+		if err != nil { // user was deleted
+			if err := session.Destroy(); err != nil { // destroy this invalid session
 				return handler.UnwrapAndSendError(c, model.InternalServerError{Message: "Could not destroy session", Err: err})
 			}
 			return handler.UnwrapAndSendError(c, model.UnauthorizedError{})
 		}
+
+		// TODO: do we need to destroy this session if the username was changed?
+		username, ok := session.Get("username").(string)
+		if !ok || username != user.Username {
+			if err := session.Destroy(); err != nil { // destroy this session that was authenticated with the old username
+				return handler.UnwrapAndSendError(c, model.InternalServerError{Message: "Could not destroy session", Err: err})
+			}
+			return handler.UnwrapAndSendError(c, model.UnauthorizedError{})
+		}
+
+		// check if password was changed
+		password, ok := session.Get("password").(string)
+		if !ok || password != user.Password {
+			if err := session.Destroy(); err != nil { // destroy this session that was authenticated with the old password
+				return handler.UnwrapAndSendError(c, model.InternalServerError{Message: "Could not destroy session", Err: err})
+			}
+			return handler.UnwrapAndSendError(c, model.UnauthorizedError{})
+		}
+
 		c.Locals("user", user)
 		tokenService.GenerateApiTokenIfNotExists(user)
 		return c.Next()
 	}
 }
 
-func AllowRole(role string) fiber.Handler {
+func (s *SessionMiddleware) AllowRole(role string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		user, ok := c.Locals("user").(*model.User)
 		if !ok {
@@ -55,7 +72,7 @@ func AllowRole(role string) fiber.Handler {
 	}
 }
 
-func AllowOwnUserId(pathParamUserId string) fiber.Handler {
+func (s *SessionMiddleware) AllowOwnUserId(pathParamUserId string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		id, err := c.ParamsInt(pathParamUserId)
 		if err != nil {
@@ -72,7 +89,7 @@ func AllowOwnUserId(pathParamUserId string) fiber.Handler {
 	}
 }
 
-func AllowRoleOrOwnUserId(role, pathParamUserId string) fiber.Handler {
+func (s *SessionMiddleware) AllowRoleOrOwnUserId(role, pathParamUserId string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		user, ok := c.Locals("user").(*model.User)
 		if !ok {
