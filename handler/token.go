@@ -45,7 +45,7 @@ func (tc *TokenHandler) Get(c *fiber.Ctx) error {
 	return c.JSON(user.ApiToken)
 }
 
-type UpdateTokenRequest struct {
+type UpdateTokenPayload struct {
 	Permanent bool `json:"permanent"`
 }
 
@@ -54,7 +54,8 @@ type UpdateTokenRequest struct {
 // @Tags         Users
 // @Produce      json
 // @Param        id  path  int  true  "User ID"
-// @Success      200  {object}  model.Token
+// @Param        payload  body  UpdateTokenPayload  true  "Set whether this token is permanent (does not expire)"
+// @Success      200  "OK"
 // @Failure      400  "Bad Request"
 // @Failure      401  "Unauthorized"
 // @Failure      403  "Forbidden"
@@ -67,7 +68,7 @@ func (tc *TokenHandler) Update(c *fiber.Ctx) error {
 	if id < 0 {
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
-	var payload UpdateTokenRequest
+	var payload UpdateTokenPayload
 	if err := c.BodyParser(&payload); err != nil {
 		return UnwrapAndSendError(c, model.BadRequestError{Message: "Could not parse request body", Err: err})
 	}
@@ -87,7 +88,7 @@ func (tc *TokenHandler) Update(c *fiber.Ctx) error {
 // @Tags         Users
 // @Produce      plain
 // @Param        id   path      int  true  "User ID"
-// @Success      200  {object}  model.Token
+// @Success      200  "OK"
 // @Failure      400  "Bad Request"
 // @Failure      401  "Unauthorized"
 // @Failure      403  "Forbidden"

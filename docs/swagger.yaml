@@ -182,6 +182,11 @@ definitions:
       username:
         type: string
     type: object
+  handler.UpdateTokenPayload:
+    properties:
+      permanent:
+        type: boolean
+    type: object
 host: https://lighthouse.uni-kiel.de
 info:
   contact: {}
@@ -895,8 +900,6 @@ paths:
       responses:
         "200":
           description: OK
-          schema:
-            $ref: '#/definitions/Token'
         "400":
           description: Bad Request
         "401":
@@ -948,13 +951,17 @@ paths:
         name: id
         required: true
         type: integer
+      - description: Set whether this token is permanent (does not expire)
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/handler.UpdateTokenPayload'
       produces:
       - application/json
       responses:
         "200":
           description: OK
-          schema:
-            $ref: '#/definitions/Token'
         "400":
           description: Bad Request
         "401":
