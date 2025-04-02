@@ -4,6 +4,7 @@ import (
 	"net"
 	"slices"
 
+	"github.com/ProjectLighthouseCAU/heimdall/config"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -13,6 +14,9 @@ import (
 func AllowLoopbackAndPrivateIPs() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		clientIp := net.ParseIP(c.IP())
+		if _, ok := c.GetReqHeaders()[config.ProxyHeader]; !ok {
+			clientIp = c.Context().RemoteIP() // use remote IP if the ProxyHeader is not set
+		}
 		if clientIp.IsPrivate() || clientIp.IsLoopback() {
 			return c.Next()
 		}
@@ -23,6 +27,9 @@ func AllowLoopbackAndPrivateIPs() fiber.Handler {
 func AllowIPs(ips []net.IP) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		clientIp := net.ParseIP(c.IP())
+		if _, ok := c.GetReqHeaders()[config.ProxyHeader]; !ok {
+			clientIp = c.Context().RemoteIP() // use remote IP if the ProxyHeader is not set
+		}
 		if slices.ContainsFunc(ips, func(ip net.IP) bool {
 			return slices.Equal(ip, clientIp)
 		}) {
@@ -35,6 +42,9 @@ func AllowIPs(ips []net.IP) fiber.Handler {
 func AllowLoopbackAndPrivateIPsAnd(ips []net.IP) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		clientIp := net.ParseIP(c.IP())
+		if _, ok := c.GetReqHeaders()[config.ProxyHeader]; !ok {
+			clientIp = c.Context().RemoteIP() // use remote IP if the ProxyHeader is not set
+		}
 		if clientIp.IsPrivate() || clientIp.IsLoopback() {
 			return c.Next()
 		}
