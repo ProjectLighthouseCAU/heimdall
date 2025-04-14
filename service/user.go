@@ -65,7 +65,7 @@ func (s *UserService) Login(username, password string, session *session.Session)
 		return nil, model.UnauthorizedError{Message: "Invalid credentials", Err: nil}
 	}
 	if config.RestrictLoginToAdmins {
-		if slices.ContainsFunc(user.Roles, func(role model.Role) bool { return role.Name == config.AdminRoleName }) {
+		if !slices.ContainsFunc(user.Roles, func(role model.Role) bool { return role.Name == config.AdminRoleName }) {
 			return nil, model.ForbiddenError{Message: "Login is currently restricted to admins only"}
 		}
 	}
