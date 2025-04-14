@@ -47,6 +47,7 @@ var (
 	ApiTokenExpirationTime time.Duration = getDuration("API_TOKEN_EXPIRATION_TIME", 3*24*time.Hour)
 	MinPasswordLength      int           = getInt("MIN_PASSWORD_LENGTH", 12)
 	InternalIPs            []net.IP      = parseIPs(getString("INTERNAL_IPS", ""))
+	RestrictLoginToAdmins  bool          = getBool("RESTRICT_LOGIN_TO_ADMINS", false)
 
 	UseTestDatabase bool = getBool("USE_TEST_DATABASE", false) // TODO: remove in prod - this function deletes the whole database
 )

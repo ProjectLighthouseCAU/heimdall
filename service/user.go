@@ -1,8 +1,10 @@
 package service
 
 import (
+	"slices"
 	"time"
 
+	"github.com/ProjectLighthouseCAU/heimdall/config"
 	"github.com/ProjectLighthouseCAU/heimdall/crypto"
 	"github.com/ProjectLighthouseCAU/heimdall/model"
 	"github.com/ProjectLighthouseCAU/heimdall/repository"
@@ -61,6 +63,11 @@ func (s *UserService) Login(username, password string, session *session.Session)
 	}
 	if !crypto.PasswordMatchesHash(password, user.Password) {
 		return nil, model.UnauthorizedError{Message: "Invalid credentials", Err: nil}
+	}
+	if config.RestrictLoginToAdmins {
+		if slices.ContainsFunc(user.Roles, func(role model.Role) bool { return role.Name == config.AdminRoleName }) {
+			return nil, model.ForbiddenError{Message: "Login is currently restricted to admins only"}
+		}
 	}
 
 	session.Set("userid", user.ID)
