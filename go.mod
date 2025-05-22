@@ -5,7 +5,7 @@ go 1.24.0
 require (
 	github.com/arsmn/fiber-swagger/v2 v2.31.1
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
-	github.com/gofiber/fiber/v2 v2.52.6
+	github.com/gofiber/fiber/v2 v2.52.7
 	github.com/gofiber/storage/redis v1.3.4
 	github.com/swaggo/swag v1.16.4
 	github.com/valyala/fasthttp v1.59.0
