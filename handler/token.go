@@ -127,7 +127,7 @@ var keepalive = []byte{'\r', '\n'} // keepalive message (just newline without co
 // @Failure      400  "Bad Request"
 // @Failure      401  "Unauthorized"
 // @Failure      500  "Internal Server Error"
-// @Router       /internal/authenticate/{username} [post]
+// @Router       /internal/authenticate/{username} [get]
 func (tc *TokenHandler) WatchAuthChanges(c *fiber.Ctx) error {
 	c.Set("Content-Type", "text/event-stream")
 	c.Set("Cache-Control", "no-cache")

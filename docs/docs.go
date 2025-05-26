@@ -16,7 +16,7 @@ const docTemplate = `{
     "basePath": "{{.BasePath}}",
     "paths": {
         "/internal/authenticate/{username}": {
-            "post": {
+            "get": {
                 "description": "If the initial request was successful, the connection is kept alive and updates are sent using server sent events (SSE).",
                 "produces": [
                     "application/json"
