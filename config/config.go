@@ -41,13 +41,14 @@ var (
 	DisableRateLimiter bool = getBool("DISABLE_RATE_LIMITER", false)
 
 	// Domain specific config
-	AdminRoleName          string        = getString("ADMIN_ROLENAME", "admin")
-	DeployRoleName         string        = getString("DEPLOY_ROLENAME", "deploy")
-	RegistrationKeyLength  int           = getInt("REGISTRATION_KEY_LENGTH", 20)
-	ApiTokenExpirationTime time.Duration = getDuration("API_TOKEN_EXPIRATION_TIME", 3*24*time.Hour)
-	MinPasswordLength      int           = getInt("MIN_PASSWORD_LENGTH", 12)
-	InternalIPs            []net.IP      = parseIPs(getString("INTERNAL_IPS", ""))
-	RestrictLoginToAdmins  bool          = getBool("RESTRICT_LOGIN_TO_ADMINS", false)
+	AdminRoleName                    string        = getString("ADMIN_ROLENAME", "admin")
+	DeployRoleName                   string        = getString("DEPLOY_ROLENAME", "deploy")
+	RegistrationKeyLength            int           = getInt("REGISTRATION_KEY_LENGTH", 20)
+	ApiTokenExpirationTime           time.Duration = getDuration("API_TOKEN_EXPIRATION_TIME", 3*24*time.Hour)
+	ApiTokenGarbageCollectorInterval time.Duration = getDuration("API_TOKEN_GARBAGE_COLLECTOR_INTERVAL", 1*time.Hour)
+	MinPasswordLength                int           = getInt("MIN_PASSWORD_LENGTH", 12)
+	InternalIPs                      []net.IP      = parseIPs(getString("INTERNAL_IPS", ""))
+	RestrictLoginToAdmins            bool          = getBool("RESTRICT_LOGIN_TO_ADMINS", false)
 
 	UseTestDatabase bool = getBool("USE_TEST_DATABASE", false) // TODO: remove in prod - this function deletes the whole database
 )

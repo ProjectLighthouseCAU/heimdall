@@ -25,12 +25,24 @@ type TokenService struct {
 }
 
 func NewTokenService(tokenRepository repository.TokenRepository, userRepository repository.UserRepository) TokenService {
+	go tokenGarbageCollector(tokenRepository)
 	return TokenService{tokenRepository,
 		userRepository,
 		make(map[string][]chan *model.AuthUpdateMessage),
 		&sync.Mutex{},
 		make(map[chan *model.UserUpdateMessage]struct{}),
 		&sync.Mutex{},
+	}
+}
+
+func tokenGarbageCollector(tokenRepository repository.TokenRepository) {
+	for range time.NewTicker(config.ApiTokenGarbageCollectorInterval).C {
+		rowsAffected, err := tokenRepository.DeleteAllExpiredNonPermanent()
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		log.Printf("Successfully deleted %d expired tokens\n", rowsAffected)
 	}
 }
 

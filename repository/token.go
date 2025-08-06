@@ -54,6 +54,11 @@ func (r *TokenRepository) DeleteByID(id uint) error {
 	return wrapError(r.DB.Unscoped().Select(clause.Associations).Delete(&model.Token{UserID: id}).Error)
 }
 
+func (r *TokenRepository) DeleteAllExpiredNonPermanent() (int, error) {
+	res := r.DB.Unscoped().Where("not permanent AND expires_at < NOW()").Delete(model.Token{})
+	return (int)(res.RowsAffected), res.Error
+}
+
 func (r *TokenRepository) Migrate() error {
 	err := r.DB.AutoMigrate(&model.Token{})
 	if err != nil {
